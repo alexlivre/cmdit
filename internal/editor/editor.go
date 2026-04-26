@@ -167,7 +167,7 @@ func NewWithFile(path string) (*Model, error) {
 func (m *Model) registerActions() {
 	m.paletteActions = []command.Action{
 		{ID: "file.save", Label: "Salvar", Shortcut: "Ctrl+S"},
-		{ID: "file.save-as", Label: "Salvar como", Shortcut: "Ctrl+Alt+S"},
+		{ID: "file.save-as", Label: "Salvar como", Shortcut: "F3"},
 		{ID: "file.open", Label: "Abrir arquivo", Shortcut: "Ctrl+O"},
 		{ID: "file.quit", Label: "Sair", Shortcut: "Ctrl+Q"},
 		{ID: "edit.undo", Label: "Desfazer", Shortcut: "Ctrl+Z"},
@@ -342,12 +342,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.enterFilePicker()
 		return m, nil
 
-	case "alt+ctrl+s":
-		m.enterSaveAs()
-		return m, nil
-
 	case "f2":
 		m.enterRename()
+		return m, nil
+
+	case "f3":
+		m.enterSaveAs()
 		return m, nil
 
 	case "ctrl+q":
