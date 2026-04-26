@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.22', '1.23', '1.24']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./... -v -race -cover
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -o bin/cmdit ./cmd/cmdit
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event_name == 'pull_request' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Generate coverage
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: false
+
+  build-cross:
+    name: Cross-compile
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build Linux
+        run: GOOS=linux GOARCH=amd64 go build -o bin/cmdit-linux-amd64 ./cmd/cmdit
+
+      - name: Build Windows
+        run: GOOS=windows GOARCH=amd64 go build -o bin/cmdit-windows-amd64.exe ./cmd/cmdit
+
+      - name: Build macOS Intel
+        run: GOOS=darwin GOARCH=amd64 go build -o bin/cmdit-darwin-amd64 ./cmd/cmdit
+
+      - name: Build macOS ARM
+        run: GOOS=darwin GOARCH=arm64 go build -o bin/cmdit-darwin-arm64 ./cmd/cmdit
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: bin/*
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run go fmt check
+        run: |
+          if [ "$(gofmt -l .)" != "" ]; then
+            echo "Formatting issues found:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...

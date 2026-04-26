@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build Linux amd64
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o bin/cmdit-${{ env.GOOS }}-${{ env.GOARCH }} ./cmd/cmdit
+
+      - name: Build Linux arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+        run: go build -ldflags="-s -w" -o bin/cmdit-${{ env.GOOS }}-${{ env.GOARCH }} ./cmd/cmdit
+
+      - name: Build Windows amd64
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o bin/cmdit-${{ env.GOOS }}-${{ env.GOARCH }}.exe ./cmd/cmdit
+
+      - name: Build Windows arm64
+        env:
+          GOOS: windows
+          GOARCH: arm64
+        run: go build -ldflags="-s -w" -o bin/cmdit-${{ env.GOOS }}-${{ env.GOARCH }}.exe ./cmd/cmdit
+
+      - name: Build macOS amd64
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+        run: go build -ldflags="-s -w" -o bin/cmdit-${{ env.GOOS }}-${{ env.GOARCH }} ./cmd/cmdit
+
+      - name: Build macOS arm64
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+        run: go build -ldflags="-s -w" -o bin/cmdit-${{ env.GOOS }}-${{ env.GOARCH }} ./cmd/cmdit
+
+      - name: Generate checksums
+        run: |
+          cd bin
+          sha256sum cmdit-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: true
+          files: |
+            bin/cmdit-*
+            bin/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
