@@ -1,7 +1,7 @@
 # cmdit — Editor de texto para humanos no terminal
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev)
-[![Tests](https://img.shields.io/badge/testes-50%20passando-brightgreen)]()
+[![Tests](https://img.shields.io/badge/testes-59%20passando-brightgreen)]()
 [![Licença](https://img.shields.io/badge/licença-MIT-blue)](LICENSE)
 [![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
 
@@ -33,10 +33,11 @@ Um único binário, zero dependências.
 - ✅ **Mouse** — clique para posicionar cursor, arraste para selecionar, scroll para rolar.
 - ✅ **Atalhos familiares** — Ctrl+S, Ctrl+Z, Ctrl+C, Ctrl+V. Padrão CUA.
 - ✅ **Undo/Redo ilimitado** — Ctrl+Z / Ctrl+Y.
-- ✅ **Command Palette** — Ctrl+Shift+P acessa todos os comandos com busca fuzzy.
+- ✅ **Command Palette** — Ctrl+P acessa todos os comandos com busca fuzzy.
 - ✅ **Syntax Highlighting** — Detecção automática de linguagem. Temas dark/light/monokai/dracula/solarized.
 - ✅ **Busca e substituição** — Ctrl+F / Ctrl+H com destaque de todas as ocorrências.
 - ✅ **File picker integrado** — Ctrl+O para abrir arquivos navegando por diretórios.
+- ✅ **Renomear arquivo** — F2 renomeia o arquivo atual com input inline.
 - ✅ **Auto-save** — Salva automaticamente a cada 30 segundos.
 - ✅ **Tela de boas-vindas** — Mostra arquivos recentes ao abrir sem arquivo.
 - ✅ **Diálogo de confirmação** — Avisa ao sair se houver alterações não salvas.
@@ -109,7 +110,8 @@ cmdit
 |--------|------|
 | `Ctrl+S` | Salvar |
 | `Ctrl+O` | Abrir arquivo |
-| `Ctrl+Shift+S` | Salvar como |
+| `F3` | Salvar como |
+| `F2` | Renomear arquivo |
 | `Ctrl+Q` | Sair |
 
 ### Edição
@@ -149,7 +151,7 @@ cmdit
 
 | Atalho | Ação |
 |--------|------|
-| `Ctrl+Shift+P` | Paleta de comandos |
+| `Ctrl+P` | Paleta de comandos |
 | `Esc` | Fechar paleta / cancelar |
 
 ---

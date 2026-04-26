@@ -80,7 +80,7 @@ cmdit/
 | **1** | Editor básico | 2-3 sem | Gap buffer, inserção, Ctrl+S, Ctrl+Q |
 | **2** | Navegação | 1-2 sem | Setas, mouse, scroll, números de linha |
 | **3** | Edição power | 2-3 sem | Undo/Redo, Ctrl+C/V/X, busca, substituir |
-| **4** | Command palette | 1-2 sem | Ctrl+Shift+P, ações registradas |
+| **4** | Command palette | 1-2 sem | Ctrl+P, ações registradas |
 | **5** | Syntax highlight | 1-2 sem | Chroma, 5 temas, detecção de linguagem |
 | **6** | File operations | 1 sem | Ctrl+O, salvar como, recentes |
 | **7** | Polimento v1 | 1-2 sem | Auto-save, welcome, OSC52, status bar |
@@ -273,7 +273,7 @@ cmdit/
 
 ## 📋 Fase 4 — Command Palette
 
-**Objetivo:** Ctrl+Shift+P acessa todos os comandos com busca fuzzy.
+**Objetivo:** Ctrl+P acessa todos os comandos com busca fuzzy.
 
 - [ ] **4.1** Criar `internal/command/actions.go`
   - `type Action struct { ID, Label, Shortcut string; Handler func(*editor.Model) tea.Cmd }`
@@ -299,7 +299,7 @@ cmdit/
   - Teste: Enter executa handler correto
   - Teste: Esc fecha sem executar
 
-- [ ] **4.5** Conectar Ctrl+Shift+P ao editor
+- [ ] **4.5** Conectar Ctrl+P ao editor
 
 - [ ] **4.6** Executar `go test ./...`
 
@@ -352,7 +352,7 @@ cmdit/
   - Filtro fuzzy enquanto digita
   - Esc cancela
 
-- [ ] **6.2** Implementar Ctrl+Shift+S — Salvar como
+- [ ] **6.2** Implementar F3 — Salvar como
   - Campo de texto para digitar caminho
   - Confirmação se arquivo já existe
 
@@ -364,7 +364,7 @@ cmdit/
 - [ ] **6.4** Implementar welcome screen
   - Se `cmdit` executado sem argumento → welcome screen
   - Lista de arquivos recentes
-  - Atalhos: `Ctrl+O Abrir`, `Ctrl+Shift+P Comandos`, `Ctrl+Q Sair`
+  - Atalhos: `Ctrl+O Abrir`, `Ctrl+P Comandos`, `Ctrl+Q Sair`
   - Logo ASCII "cmdit" estilizado
 
 - [ ] **6.5** Executar `go test ./...`
@@ -400,7 +400,7 @@ cmdit/
 
 - [ ] **7.6** Tratar Ctrl+S vs flow control
   - Detectar se flow control está ativo (`stty -a`)
-  - Se sim, avisar: "Ctrl+S bloqueado pelo terminal. Use `stty -ixon` ou Ctrl+Shift+S"
+  - Se sim, avisar: "Ctrl+S bloqueado pelo terminal. Use `stty -ixon` ou F3"
 
 - [ ] **7.7** Executar `go test ./...` e `go vet ./...`
 - [ ] **7.8** Build cross-platform: Windows, Linux, macOS
@@ -547,7 +547,7 @@ cmdit/
 | **M2** | 1 | Abre, digita, Ctrl+S, reabre — texto persiste |
 | **M3** | 2 | Mouse, setas, scroll, números de linha |
 | **M4** | 3 | Undo/Redo, clipboard, Ctrl+F busca |
-| **M5** | 4 | Ctrl+Shift+P palette com todos os comandos |
+| **M5** | 4 | Ctrl+P palette com todos os comandos |
 | **M6** | 5 | Syntax highlight com 5 temas, detecção automática |
 | **M7: v1** | 6+7 | Binário único 3 plataformas, usável por leigos |
 | **M8: v2** | 8+9+10 | LSP, plugins Lua, múltiplos cursores, CI/CD |
@@ -562,7 +562,8 @@ cmdit/
 | `Ctrl+S` | Salvar | 1 |
 | `Ctrl+Q` | Sair (confirma se modificado) | 1 |
 | `Ctrl+O` | Abrir arquivo | 6 |
-| `Ctrl+Shift+S` | Salvar como | 6 |
+| `F3` | Salvar como | 6 |
+| `F2` | Renomear arquivo | 6 |
 | Setas | Mover cursor | 2 |
 | `Ctrl+←/→` | Pular palavra | 2 |
 | `Home/End` | Início/fim da linha | 2 |
@@ -577,7 +578,7 @@ cmdit/
 | `Ctrl+A` | Selecionar tudo | 3 |
 | `Ctrl+F` | Buscar | 3 |
 | `Ctrl+H` | Substituir | 3 |
-| `Ctrl+Shift+P` | Command palette | 4 |
+| `Ctrl+P` | Command palette | 4 |
 | `Ctrl+T` | Nova aba | 8 |
 | `Ctrl+W` | Fechar aba | 8 |
 | `Ctrl+Tab` | Alternar aba | 8 |
