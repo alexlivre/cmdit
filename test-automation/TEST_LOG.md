@@ -1,5 +1,12 @@
 # Test Log — 2026-04-26
 
+## Resumo (2026-04-26 - Ctrl+Shift+S → Ctrl+Alt+S)
+- Total de testes: 59
+- Passaram: 59 ✅
+- Falharam: 0 ❌
+- Alteração: atalho Salvar como alterado de Ctrl+Shift+S para Ctrl+Alt+S
+- Motivo: mesma limitação — Alt é detectável (ESC prefix), Shift não
+
 ## Resumo (2026-04-26 - Ctrl+Shift+P → Ctrl+P)
 - Total de testes: 59
 - Passaram: 59 ✅
