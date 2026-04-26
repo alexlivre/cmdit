@@ -352,7 +352,7 @@ cmdit/
   - Filtro fuzzy enquanto digita
   - Esc cancela
 
-- [ ] **6.2** Implementar Ctrl+Shift+S — Salvar como
+- [ ] **6.2** Implementar Ctrl+Alt+S — Salvar como
   - Campo de texto para digitar caminho
   - Confirmação se arquivo já existe
 
@@ -400,7 +400,7 @@ cmdit/
 
 - [ ] **7.6** Tratar Ctrl+S vs flow control
   - Detectar se flow control está ativo (`stty -a`)
-  - Se sim, avisar: "Ctrl+S bloqueado pelo terminal. Use `stty -ixon` ou Ctrl+Shift+S"
+  - Se sim, avisar: "Ctrl+S bloqueado pelo terminal. Use `stty -ixon` ou Ctrl+Alt+S"
 
 - [ ] **7.7** Executar `go test ./...` e `go vet ./...`
 - [ ] **7.8** Build cross-platform: Windows, Linux, macOS
@@ -562,7 +562,7 @@ cmdit/
 | `Ctrl+S` | Salvar | 1 |
 | `Ctrl+Q` | Sair (confirma se modificado) | 1 |
 | `Ctrl+O` | Abrir arquivo | 6 |
-| `Ctrl+Shift+S` | Salvar como | 6 |
+| `Ctrl+Alt+S` | Salvar como | 6 |
 | `F2` | Renomear arquivo | 6 |
 | Setas | Mover cursor | 2 |
 | `Ctrl+←/→` | Pular palavra | 2 |

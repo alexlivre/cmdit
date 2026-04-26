@@ -110,7 +110,7 @@ cmdit
 |--------|------|
 | `Ctrl+S` | Salvar |
 | `Ctrl+O` | Abrir arquivo |
-| `Ctrl+Shift+S` | Salvar como |
+| `Ctrl+Alt+S` | Salvar como |
 | `F2` | Renomear arquivo |
 | `Ctrl+Q` | Sair |
 
