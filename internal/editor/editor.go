@@ -334,7 +334,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "ctrl+shift+p":
+	case "ctrl+p":
 		m.enterPalette()
 		return m, nil
 
@@ -1241,7 +1241,7 @@ func (m *Model) renderWelcome() string {
 	}
 
 	lines = append(lines, "Ctrl+O  Abrir arquivo")
-	lines = append(lines, "Ctrl+Shift+P  Paleta de comandos")
+	lines = append(lines, "Ctrl+P  Paleta de comandos")
 	lines = append(lines, "Ctrl+Q  Sair")
 	lines = append(lines, "")
 	lines = append(lines, "Comece a digitar para criar um novo arquivo...")

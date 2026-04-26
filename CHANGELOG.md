@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Clipboard** — Copy, cut, paste (Ctrl+C / Ctrl+X / Ctrl+V)
 - **Syntax highlighting** — 50+ languages via Chroma. Auto-detects language.
 - **5 color themes** — Dark, light, monokai, dracula, solarized
-- **Command palette** — Ctrl+Shift+P for fuzzy search of all commands
+- **Command palette** — Ctrl+P for fuzzy search of all commands
 - **File operations** — Open (Ctrl+O), Save (Ctrl+S), Save As (Ctrl+Shift+S)
 - **File picker** — Navigate directories to open files
 - **Welcome screen** — Shows recent files and shortcuts on startup

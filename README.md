@@ -33,7 +33,7 @@ Um único binário, zero dependências.
 - ✅ **Mouse** — clique para posicionar cursor, arraste para selecionar, scroll para rolar.
 - ✅ **Atalhos familiares** — Ctrl+S, Ctrl+Z, Ctrl+C, Ctrl+V. Padrão CUA.
 - ✅ **Undo/Redo ilimitado** — Ctrl+Z / Ctrl+Y.
-- ✅ **Command Palette** — Ctrl+Shift+P acessa todos os comandos com busca fuzzy.
+- ✅ **Command Palette** — Ctrl+P acessa todos os comandos com busca fuzzy.
 - ✅ **Syntax Highlighting** — Detecção automática de linguagem. Temas dark/light/monokai/dracula/solarized.
 - ✅ **Busca e substituição** — Ctrl+F / Ctrl+H com destaque de todas as ocorrências.
 - ✅ **File picker integrado** — Ctrl+O para abrir arquivos navegando por diretórios.
@@ -151,7 +151,7 @@ cmdit
 
 | Atalho | Ação |
 |--------|------|
-| `Ctrl+Shift+P` | Paleta de comandos |
+| `Ctrl+P` | Paleta de comandos |
 | `Esc` | Fechar paleta / cancelar |
 
 ---
