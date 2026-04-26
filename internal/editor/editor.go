@@ -1144,6 +1144,8 @@ func (m *Model) executeAction(id string) {
 	switch id {
 	case "file.save":
 		m.save()
+	case "file.save-as":
+		m.enterSaveAs()
 	case "file.quit":
 		if m.modified {
 			m.mode = ModeConfirm
