@@ -1,9 +1,13 @@
 # Test Log — 2026-04-26
 
-## Resumo
+## Resumo (2026-04-26 - Ctrl+Shift+P → Ctrl+P)
 - Total de testes: 59
 - Passaram: 59 ✅
 - Falharam: 0 ❌
+- Alteração: atalho da paleta de comandos alterado de Ctrl+Shift+P para Ctrl+P
+- Motivo: Ctrl+Shift+P é indetectável — protocolo ASCII não distingue Ctrl+Shift+letra de Ctrl+letra
+
+## Resumo (v0.2.0 - rename feature)
 - Cobertura: ~70%
 
 ## Resultados Detalhados
