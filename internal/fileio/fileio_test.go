@@ -75,6 +75,91 @@ func TestSaveFilePermissions(t *testing.T) {
 	}
 }
 
+func TestRenameSuccess(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "old.txt")
+	newPath := filepath.Join(dir, "new.txt")
+
+	content := "hello\nworld\n"
+	if err := os.WriteFile(oldPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	if err := Rename(oldPath, newPath); err != nil {
+		t.Fatalf("Rename failed: %v", err)
+	}
+
+	// Old file should not exist
+	if _, err := os.Stat(oldPath); err == nil {
+		t.Error("old file still exists after rename")
+	}
+
+	// New file should exist with same content
+	data, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatalf("new file not found: %v", err)
+	}
+	if string(data) != content {
+		t.Errorf("content mismatch:\n  expected: %q\n  got:      %q", content, string(data))
+	}
+}
+
+func TestRenameSourceNotFound(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "nonexistent.txt")
+	newPath := filepath.Join(dir, "new.txt")
+
+	err := Rename(oldPath, newPath)
+	if err == nil {
+		t.Error("expected error for nonexistent source")
+	}
+}
+
+func TestRenameEmptyName(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "old.txt")
+
+	// Create file first
+	if err := os.WriteFile(oldPath, []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	err := Rename(oldPath, "")
+	if err == nil {
+		t.Error("expected error for empty destination name")
+	}
+}
+
+func TestRenameDestinationExists(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "old.txt")
+	existingPath := filepath.Join(dir, "existing.txt")
+
+	if err := os.WriteFile(oldPath, []byte("old content"), 0644); err != nil {
+		t.Fatalf("failed to create old file: %v", err)
+	}
+	if err := os.WriteFile(existingPath, []byte("existing content"), 0644); err != nil {
+		t.Fatalf("failed to create existing file: %v", err)
+	}
+
+	err := Rename(oldPath, existingPath)
+	// On Windows: error (file exists)
+	// On Unix: success (silent overwrite)
+	if err != nil {
+		// Windows behavior — acceptable
+		t.Logf("Rename to existing file returned error (expected on Windows): %v", err)
+	} else {
+		// Unix behavior — verify overwrite
+		data, err := os.ReadFile(existingPath)
+		if err != nil {
+			t.Fatalf("existing file not found after overwrite: %v", err)
+		}
+		if string(data) != "old content" {
+			t.Errorf("content mismatch after overwrite:\n  expected: %q\n  got:      %q", "old content", string(data))
+		}
+	}
+}
+
 func newTestBuffer() *buffer.Buffer {
 	return newTestBufferWithString("hello\nworld\n")
 }
