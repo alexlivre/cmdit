@@ -20,3 +20,10 @@ func Load(path string) (*buffer.Buffer, error) {
 func Save(path string, buf *buffer.Buffer) error {
 	return os.WriteFile(path, []byte(buf.String()), 0644)
 }
+
+// Rename renames a file from oldPath to newPath.
+// Uses os.Rename which fails on Windows if destination exists,
+// but silently overwrites on Unix.
+func Rename(oldPath, newPath string) error {
+	return os.Rename(oldPath, newPath)
+}

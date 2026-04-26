@@ -1,6 +1,8 @@
 package editor
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -210,5 +212,287 @@ func TestSearchExecute(t *testing.T) {
 
 	if len(m.searchMatches) != 2 {
 		t.Errorf("expected 2 matches, got %d", len(m.searchMatches))
+	}
+}
+
+// --- Rename Tests ---
+
+func TestRenameNoFile(t *testing.T) {
+	m := New()
+	// F2 on a new buffer (no file) should not enter rename mode
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+
+	if m.mode == ModeRename {
+		t.Error("expected not to enter ModeRename when no file is open")
+	}
+	if m.mode != ModeWelcome {
+		t.Errorf("expected ModeWelcome, got %v", m.mode)
+	}
+}
+
+func TestRenameEnterAndCancel(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(path, []byte("hello"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	m := New()
+	m.filename = path
+	m.mode = ModeNormal
+
+	// F2 enters rename mode
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	if m.mode != ModeRename {
+		t.Errorf("expected ModeRename, got %v", m.mode)
+	}
+	if m.renameInput != "test.txt" {
+		t.Errorf("expected renameInput 'test.txt', got %q", m.renameInput)
+	}
+
+	// Esc cancels and returns to normal
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	if m.mode != ModeNormal {
+		t.Errorf("expected ModeNormal after cancel, got %v", m.mode)
+	}
+	if m.filename != path {
+		t.Errorf("filename should not change after cancel")
+	}
+}
+
+func TestRenameSuccess(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "old.txt")
+	newPath := filepath.Join(dir, "new.txt")
+
+	if err := os.WriteFile(oldPath, []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	m := New()
+	m.filename = oldPath
+	m.mode = ModeNormal
+
+	// Enter rename mode
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	if m.renameInput != "old.txt" {
+		t.Errorf("expected renameInput 'old.txt', got %q", m.renameInput)
+	}
+
+	// Clear and type new name
+	for i := 0; i < len("old.txt"); i++ {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	for _, r := range "new.txt" {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// Press Enter to confirm
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.mode != ModeNormal {
+		t.Errorf("expected ModeNormal after rename, got %v", m.mode)
+	}
+	if m.filename != newPath {
+		t.Errorf("expected filename %q, got %q", newPath, m.filename)
+	}
+
+	// Old file should not exist
+	if _, err := os.Stat(oldPath); err == nil {
+		t.Error("old file still exists after rename")
+	}
+	// New file should exist
+	if _, err := os.Stat(newPath); err != nil {
+		t.Error("new file does not exist after rename")
+	}
+}
+
+func TestRenameEmptyName(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(path, []byte("hi"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	m := New()
+	m.filename = path
+	m.mode = ModeNormal
+
+	// Enter rename mode
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	// Clear input with backspace
+	for i := 0; i < len("test.txt"); i++ {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	// Press Enter with empty name
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.renameError == "" {
+		t.Error("expected error for empty name")
+	}
+	if m.mode != ModeRename {
+		t.Errorf("expected to stay in ModeRename, got %v", m.mode)
+	}
+	if m.filename != path {
+		t.Errorf("filename should not change on error")
+	}
+}
+
+func TestRenameUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(path, []byte("hi"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	m := New()
+	m.filename = path
+	m.mode = ModeNormal
+
+	// Enter rename mode and press Enter immediately (same name)
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.mode != ModeNormal {
+		t.Errorf("expected ModeNormal, got %v", m.mode)
+	}
+	if m.filename != path {
+		t.Errorf("filename should not change")
+	}
+}
+
+func TestRenameInvalidChars(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(path, []byte("hi"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	for _, invalid := range []string{"a:b", "a<b", "a>b", "a|b", "a?b", "a*b", "a\"b"} {
+		m := New()
+		m.filename = path
+		m.mode = ModeNormal
+
+		m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+		// Clear and type invalid name
+		for i := 0; i < len("test.txt"); i++ {
+			m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+		}
+		for _, r := range invalid {
+			m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		}
+		m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+		if m.renameError == "" {
+			t.Errorf("expected error for invalid name %q", invalid)
+		}
+		if m.mode != ModeRename {
+			t.Errorf("expected to stay in ModeRename for %q, got %v", invalid, m.mode)
+		}
+	}
+}
+
+func TestRenameExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "old.txt")
+	existingPath := filepath.Join(dir, "existing.txt")
+
+	if err := os.WriteFile(oldPath, []byte("old"), 0644); err != nil {
+		t.Fatalf("failed to create old file: %v", err)
+	}
+	if err := os.WriteFile(existingPath, []byte("existing"), 0644); err != nil {
+		t.Fatalf("failed to create existing file: %v", err)
+	}
+
+	m := New()
+	m.filename = oldPath
+	m.mode = ModeNormal
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	// Clear and type existing name
+	for i := 0; i < len("old.txt"); i++ {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	for _, r := range "existing.txt" {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.renameError == "" {
+		t.Error("expected error when destination exists")
+	}
+	if m.mode != ModeRename {
+		t.Errorf("expected to stay in ModeRename, got %v", m.mode)
+	}
+	if m.filename != oldPath {
+		t.Errorf("filename should not change when dest exists")
+	}
+}
+
+func TestRenameUnsavedChanges(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(path, []byte("original"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	m, err := NewWithFile(path)
+	if err != nil {
+		t.Fatalf("NewWithFile failed: %v", err)
+	}
+	if m.filename != path {
+		t.Fatalf("expected filename %q, got %q", path, m.filename)
+	}
+
+	// Type additional content
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+
+	if !m.modified {
+		t.Fatal("expected modified to be true")
+	}
+	if m.buf.String() != "originalx" {
+		t.Fatalf("expected buffer 'originalx', got %q", m.buf.String())
+	}
+
+	newPath := filepath.Join(dir, "renamed.txt")
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	// Clear and type new name
+	for i := 0; i < len("test.txt"); i++ {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	for _, r := range "renamed.txt" {
+		m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.mode != ModeNormal {
+		t.Errorf("expected ModeNormal after rename, got %v", m.mode)
+	}
+	if m.filename != newPath {
+		t.Errorf("expected filename %q, got %q", newPath, m.filename)
+	}
+
+	// Verify new file contains both original + added content
+	data, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatalf("new file not found: %v", err)
+	}
+	if string(data) != "originalx" {
+		t.Errorf("expected 'originalx', got %q", string(data))
+	}
+}
+
+func TestPaletteActionRename(t *testing.T) {
+	m := New()
+	m.filename = "test.txt"
+	m.mode = ModeNormal
+
+	m.executeAction("file.rename")
+
+	if m.mode != ModeRename {
+		t.Errorf("expected ModeRename via palette, got %v", m.mode)
+	}
+	if m.renameInput != "test.txt" {
+		t.Errorf("expected renameInput 'test.txt', got %q", m.renameInput)
 	}
 }

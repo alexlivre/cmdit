@@ -563,6 +563,7 @@ cmdit/
 | `Ctrl+Q` | Sair (confirma se modificado) | 1 |
 | `Ctrl+O` | Abrir arquivo | 6 |
 | `Ctrl+Shift+S` | Salvar como | 6 |
+| `F2` | Renomear arquivo | 6 |
 | Setas | Mover cursor | 2 |
 | `Ctrl+←/→` | Pular palavra | 2 |
 | `Home/End` | Início/fim da linha | 2 |

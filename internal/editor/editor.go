@@ -30,6 +30,7 @@ const (
 	ModePalette
 	ModeFilePicker
 	ModeSaveAs
+	ModeRename
 	ModeWelcome
 )
 
@@ -81,6 +82,10 @@ type Model struct {
 
 	// Recent files
 	recentFiles []string
+
+	// Rename state
+	renameInput string
+	renameError string
 
 	width  int
 	height int
@@ -174,6 +179,7 @@ func (m *Model) registerActions() {
 		{ID: "search.find", Label: "Buscar", Shortcut: "Ctrl+F"},
 		{ID: "search.replace", Label: "Substituir", Shortcut: "Ctrl+H"},
 		{ID: "view.go-line", Label: "Ir para linha", Shortcut: "Ctrl+G"},
+		{ID: "file.rename", Label: "Renomear arquivo", Shortcut: "F2"},
 	}
 }
 
@@ -236,12 +242,19 @@ func (m *Model) renderContent() string {
 	if m.mode == ModeSearch || m.mode == ModeReplace {
 		parts = append(parts, m.renderSearchBar())
 	}
+	// Rename bar
+	if m.mode == ModeRename {
+		parts = append(parts, m.renderRenameBar())
+	}
 
 	// Main content
 	lines := m.buf.Lines()
 	lineNumWidth := m.lineNumberWidth()
 	contentHeight := m.viewport.Height()
 	if m.mode == ModeSearch || m.mode == ModeReplace {
+		contentHeight -= 1
+	}
+	if m.mode == ModeRename {
 		contentHeight -= 1
 	}
 
@@ -308,6 +321,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.mode == ModeSaveAs {
 		return m.handleSaveAsKey(msg)
 	}
+	if m.mode == ModeRename {
+		return m.handleRenameKey(msg)
+	}
 	// In search/replace mode, handle input differently
 	if m.mode == ModeSearch || m.mode == ModeReplace {
 		return m.handleSearchKey(msg)
@@ -328,6 +344,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "ctrl+shift+s":
 		m.enterSaveAs()
+		return m, nil
+
+	case "f2":
+		m.enterRename()
 		return m, nil
 
 	case "ctrl+q":
@@ -1153,6 +1173,8 @@ func (m *Model) executeAction(id string) {
 		m.searchQuery = ""
 		m.replaceQuery = ""
 		m.searchMatches = nil
+	case "file.rename":
+		m.enterRename()
 	}
 }
 
@@ -1419,6 +1441,115 @@ func (m *Model) renderSaveAs() string {
 	content := strings.Join(lines, "\n")
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 		m.paletteStyle.Render(content))
+}
+
+// --- Rename ---
+
+func (m *Model) enterRename() {
+	if m.filename == "" {
+		return
+	}
+	m.mode = ModeRename
+	m.renameInput = filepath.Base(m.filename)
+	m.renameError = ""
+}
+
+func (m *Model) handleRenameKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = ModeNormal
+		m.renameError = ""
+		return m, nil
+
+	case "enter":
+		return m.confirmRename()
+
+	case "backspace":
+		if len(m.renameInput) > 0 {
+			m.renameInput = m.renameInput[:len(m.renameInput)-1]
+			m.renameError = ""
+		}
+
+	default:
+		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
+			m.renameInput += string(msg.Runes)
+			m.renameError = ""
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) confirmRename() (tea.Model, tea.Cmd) {
+	newName := strings.TrimSpace(m.renameInput)
+	oldPath := m.filename
+
+	if newName == "" {
+		m.renameError = "Nome nao pode estar vazio."
+		return m, nil
+	}
+	if newName == filepath.Base(oldPath) {
+		m.mode = ModeNormal
+		m.renameError = ""
+		return m, nil
+	}
+	if err := validateFileName(newName); err != nil {
+		m.renameError = err.Error()
+		return m, nil
+	}
+
+	// Auto-save if modified
+	if m.modified {
+		m.save()
+		if m.modified {
+			m.renameError = "Erro ao salvar antes de renomear."
+			return m, nil
+		}
+	}
+
+	// Execute rename
+	dir := filepath.Dir(oldPath)
+	newPath := filepath.Join(dir, newName)
+
+	// Check if destination exists (cross-platform safety)
+	if _, err := os.Stat(newPath); err == nil {
+		m.renameError = fmt.Sprintf("Arquivo ja existe: %s", newName)
+		return m, nil
+	}
+
+	if err := fileio.Rename(oldPath, newPath); err != nil {
+		m.renameError = fmt.Sprintf("Erro ao renomear: %v", err)
+		return m, nil
+	}
+
+	// Success
+	m.filename = newPath
+	m.language = highlight.DetectLanguage(newPath)
+	m.mode = ModeNormal
+	m.renameError = ""
+	m.addRecentFile(newPath)
+	return m, nil
+}
+
+func (m *Model) renderRenameBar() string {
+	oldName := filepath.Base(m.filename)
+	s := fmt.Sprintf("Renomear: %s → %s", oldName, m.renameInput)
+	if m.renameError != "" {
+		s += "  " + lipgloss.NewStyle().
+			Foreground(lipgloss.Color("203")).
+			Render("(" + m.renameError + ")")
+	}
+	return m.searchStyle.Render(s)
+}
+
+// validateFileName checks for invalid characters in a file name.
+func validateFileName(name string) error {
+	invalid := []rune{'/', '\\', ':', '*', '?', '"', '<', '>', '|'}
+	for _, c := range invalid {
+		if strings.ContainsRune(name, c) {
+			return fmt.Errorf("caractere invalido: %c", c)
+		}
+	}
+	return nil
 }
 
 // --- Recent Files ---
