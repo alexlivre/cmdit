@@ -589,5 +589,5 @@ SplitContainer (tea.Model)
 
 ---
 
-> **Última atualização:** 2026-04-26
-> **Versão:** 1.0
+> **Última atualização:** 2026-04-30
+> **Versão:** 1.1

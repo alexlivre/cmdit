@@ -1,7 +1,8 @@
 # cmdit — Editor de texto para humanos no terminal
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev)
-[![Tests](https://img.shields.io/badge/testes-59%20passando-brightgreen)]()
+[![Tests](https://img.shields.io/badge/testes-65%20passando-brightgreen)]()
+[![Version](https://img.shields.io/badge/versão-v0.3.1-blue)](https://github.com/alexlivre/cmdit/releases/tag/v0.3.1)
 [![Licença](https://img.shields.io/badge/licença-MIT-blue)](LICENSE)
 [![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
 
@@ -246,8 +247,8 @@ go test ./...
 go test ./... -cover
 
 # Resultado atual
-# 50 testes passando em 5 pacotes
-# buffer (17) | clipboard (4) | editor (14) | fileio (4) | renderer (9)
+# 65 testes passando em 6 pacotes
+# buffer (17) | clipboard (4) | editor (14) | fileio (4) | renderer (9) | tabs (6)
 # go vet ./... ✅ sem warnings
 ```
 

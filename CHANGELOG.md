@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] — 2026-04-30
+
+### Fixed
+
+- **tea.Quit propagation** — When closing the last tab via confirm dialog (`Ctrl+W` → `S`/`D`), the `tea.Quit` command was lost because `delegateToEditor` returned `nil` instead of the editor's command. Fixed by propagating `cmd` from the editor after tab closure.
+- **Ctrl+Tab key mapping** — Changed from `ctrl+tab` to also accept `ctrl+v` (BubbleTea v1.3.10 limitation — both map to the same key code on Windows). Removed non-functional `ctrl+shift+tab` handler (same issue).
+- **gofmt compliance** — All 9 source files reformatted with `gofmt -w .` for consistent line endings across platforms. CI Lint job now passes.
+
+### Added
+
+- **6 flow tests** — New `internal/tabs/flow_test.go` covering all tab close scenarios: save+close, discard+close, cancel, new tab, clean tab close, Ctrl+Tab cycling. Total tests: 65 (was 59).
+
+## [0.3.0] — 2026-04-30
 
 ### Added — Phase 8: Power Features
 
@@ -64,4 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structure:** Elm-like (Model/Update/View)
 - **Buffer:** Gap buffer v1 (Rope planned for v2)
 
+[0.3.1]: https://github.com/alexlivre/cmdit/releases/tag/v0.3.1
+[0.3.0]: https://github.com/alexlivre/cmdit/releases/tag/v0.3.0
+[0.2.0]: https://github.com/alexlivre/cmdit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/alexlivre/cmdit/releases/tag/v0.1.0
