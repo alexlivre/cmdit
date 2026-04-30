@@ -373,7 +373,7 @@ func (m *Model) renderRenameBar() string {
 	if m.renameError != "" {
 		s += "  " + lipgloss.NewStyle().
 			Foreground(lipgloss.Color("203")).
-			Render("(" + m.renameError + ")")
+			Render("("+m.renameError+")")
 	}
 	return m.searchStyle.Render(s)
 }

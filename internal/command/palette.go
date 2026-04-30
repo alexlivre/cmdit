@@ -17,22 +17,22 @@ type PaletteModel struct {
 	width    int
 	handler  Handler
 
-	style       lipgloss.Style
-	inputStyle  lipgloss.Style
-	itemStyle   lipgloss.Style
-	activeStyle lipgloss.Style
+	style         lipgloss.Style
+	inputStyle    lipgloss.Style
+	itemStyle     lipgloss.Style
+	activeStyle   lipgloss.Style
 	shortcutStyle lipgloss.Style
 }
 
 // NewPalette creates a new command palette.
 func NewPalette(registry *Registry, handler Handler) *PaletteModel {
 	p := &PaletteModel{
-		registry:     registry,
-		handler:      handler,
-		style:        lipgloss.NewStyle().Background(lipgloss.Color("236")).Padding(1, 2),
-		inputStyle:   lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("15")).Padding(0, 1),
-		itemStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
-		activeStyle:  lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")).Padding(0, 1),
+		registry:      registry,
+		handler:       handler,
+		style:         lipgloss.NewStyle().Background(lipgloss.Color("236")).Padding(1, 2),
+		inputStyle:    lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("15")).Padding(0, 1),
+		itemStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
+		activeStyle:   lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")).Padding(0, 1),
 		shortcutStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
 	}
 	p.filter()

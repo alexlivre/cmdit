@@ -34,3 +34,4 @@ temp/
 
 # Qwen local config
 .qwen/
+".playwright-mcp/"  

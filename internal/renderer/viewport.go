@@ -3,10 +3,10 @@ package renderer
 
 // Viewport tracks the visible region of the text buffer.
 type Viewport struct {
-	scrollY   int // First visible line
-	scrollX   int // First visible column
-	width     int // Terminal width
-	height    int // Terminal height (content area)
+	scrollY int // First visible line
+	scrollX int // First visible column
+	width   int // Terminal width
+	height  int // Terminal height (content area)
 }
 
 // NewViewport creates a viewport with the given dimensions.

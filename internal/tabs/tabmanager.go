@@ -25,10 +25,10 @@ type TabManager struct {
 	height    int
 
 	// Tab bar styles
-	tabBarStyle     lipgloss.Style
-	tabActiveStyle  lipgloss.Style
+	tabBarStyle      lipgloss.Style
+	tabActiveStyle   lipgloss.Style
 	tabInactiveStyle lipgloss.Style
-	tabModifiedDot  lipgloss.Style
+	tabModifiedDot   lipgloss.Style
 }
 
 // New creates a new TabManager with one empty tab.

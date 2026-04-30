@@ -3,8 +3,8 @@ package tabs
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/alexb/cmdit/internal/editor"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // TestCloseTabSaveClose tests: modified file → Ctrl+W → S (save) → tab closes

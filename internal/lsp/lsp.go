@@ -81,8 +81,8 @@ type PublishDiagnosticsParams struct {
 
 // InitializeParams is sent for the initialize request.
 type InitializeParams struct {
-	ProcessID int    `json:"processId"`
-	RootURI   string `json:"rootUri,omitempty"`
+	ProcessID    int                `json:"processId"`
+	RootURI      string             `json:"rootUri,omitempty"`
 	Capabilities ClientCapabilities `json:"capabilities"`
 }
 
@@ -110,9 +110,9 @@ type InitializeResult struct {
 
 // ServerCapabilities describes what the server supports.
 type ServerCapabilities struct {
-	TextDocumentSync int `json:"textDocumentSync,omitempty"` // 0=None, 1=Full, 2=Incremental
+	TextDocumentSync   int                `json:"textDocumentSync,omitempty"` // 0=None, 1=Full, 2=Incremental
 	CompletionProvider *CompletionOptions `json:"completionProvider,omitempty"`
-	DefinitionProvider bool `json:"definitionProvider,omitempty"`
+	DefinitionProvider bool               `json:"definitionProvider,omitempty"`
 }
 
 // CompletionOptions describes completion capabilities.
@@ -176,9 +176,9 @@ type CompletionParams struct {
 
 // CompletionItem represents a completion suggestion.
 type CompletionItem struct {
-	Label  string `json:"label"`
-	Kind   int    `json:"kind,omitempty"`
-	Detail string `json:"detail,omitempty"`
+	Label      string `json:"label"`
+	Kind       int    `json:"kind,omitempty"`
+	Detail     string `json:"detail,omitempty"`
 	InsertText string `json:"insertText,omitempty"`
 }
 

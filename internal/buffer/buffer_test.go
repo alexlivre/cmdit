@@ -198,9 +198,9 @@ func TestLineCol(t *testing.T) {
 	// 0:a 1:b 2:\n 3:c 4:d 5:\n 6:e 7:f
 
 	tests := []struct {
-		index    int
-		expLine  int
-		expCol   int
+		index   int
+		expLine int
+		expCol  int
 	}{
 		{0, 0, 0},
 		{1, 0, 1},
