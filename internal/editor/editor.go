@@ -25,7 +25,7 @@ import (
 type Mode int
 
 const (
-	ModeNormal   Mode = iota
+	ModeNormal Mode = iota
 	ModeConfirm
 	ModeSearch
 	ModeReplace
@@ -40,7 +40,7 @@ const (
 type ConfirmAction int
 
 const (
-	ConfirmQuit     ConfirmAction = iota
+	ConfirmQuit ConfirmAction = iota
 	ConfirmCloseTab
 )
 
@@ -64,15 +64,15 @@ type EditorCursor struct {
 
 // Model is the main Bubble Tea model for the editor.
 type Model struct {
-	buf        *buffer.Buffer
-	cursor     *buffer.Cursor
-	viewport   *renderer.Viewport
-	undoStack  *buffer.UndoStack
-	clipboard  *clipboard.Clipboard
-	filename   string
-	modified   bool
-	mode       Mode
-	language   string
+	buf       *buffer.Buffer
+	cursor    *buffer.Cursor
+	viewport  *renderer.Viewport
+	undoStack *buffer.UndoStack
+	clipboard *clipboard.Clipboard
+	filename  string
+	modified  bool
+	mode      Mode
+	language  string
 
 	highlighter *highlight.Highlighter
 
@@ -96,11 +96,11 @@ type Model struct {
 	paletteSel     int
 
 	// File picker state
-	filePickerDir    string
-	filePickerFiles  []string
-	filePickerSel    int
-	filePickerQuery  string
-	saveAsQuery      string
+	filePickerDir   string
+	filePickerFiles []string
+	filePickerSel   int
+	filePickerQuery string
+	saveAsQuery     string
 
 	// Recent files
 	recentFiles []string
@@ -116,29 +116,29 @@ type Model struct {
 	closeRequested bool
 
 	// LSP integration
-	lspClient       *lsp.Client
-	diagnostics     map[int][]lsp.Diagnostic // line → diagnostics
-	lspVersion      int
+	lspClient        *lsp.Client
+	diagnostics      map[int][]lsp.Diagnostic // line → diagnostics
+	lspVersion       int
 	lspDiagnosticsMu sync.Mutex
 
 	width  int
 	height int
 
 	// Styles
-	statusStyle     lipgloss.Style
-	statusModified  lipgloss.Style
-	statusNormal    lipgloss.Style
-	confirmStyle    lipgloss.Style
-	confirmBtnStyle lipgloss.Style
-	lineNumStyle    lipgloss.Style
-	searchStyle     lipgloss.Style
-	matchStyle      lipgloss.Style
-	currentMatch    lipgloss.Style
-	selectionStyle  lipgloss.Style
-	paletteStyle    lipgloss.Style
-	paletteInput    lipgloss.Style
-	paletteActive   lipgloss.Style
-	paletteShortcut lipgloss.Style
+	statusStyle      lipgloss.Style
+	statusModified   lipgloss.Style
+	statusNormal     lipgloss.Style
+	confirmStyle     lipgloss.Style
+	confirmBtnStyle  lipgloss.Style
+	lineNumStyle     lipgloss.Style
+	searchStyle      lipgloss.Style
+	matchStyle       lipgloss.Style
+	currentMatch     lipgloss.Style
+	selectionStyle   lipgloss.Style
+	paletteStyle     lipgloss.Style
+	paletteInput     lipgloss.Style
+	paletteActive    lipgloss.Style
+	paletteShortcut  lipgloss.Style
 	cursorExtraStyle lipgloss.Style
 	indentGuideStyle lipgloss.Style
 }
@@ -146,32 +146,32 @@ type Model struct {
 // New creates a new editor model.
 func New() *Model {
 	m := &Model{
-		buf:             buffer.NewBuffer(),
-		cursor:          buffer.NewCursor(),
-		viewport:        renderer.NewViewport(80, 24),
-		undoStack:       buffer.NewUndoStack(),
-		clipboard:       clipboard.New(),
-		filename:        "",
-		modified:        false,
-		mode:            ModeWelcome,
-		language:        "",
-		highlighter:     highlight.NewHighlighter(highlight.ThemeDark),
-		selStart:        -1,
-		selEnd:          -1,
-		statusStyle:     lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252")).Padding(0, 1),
-		statusModified:  lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
-		statusNormal:    lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
-		confirmStyle:    lipgloss.NewStyle().Background(lipgloss.Color("240")).Padding(1, 2),
-		confirmBtnStyle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")),
-		lineNumStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
-		searchStyle:     lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("252")).Padding(0, 1),
-		matchStyle:      lipgloss.NewStyle().Background(lipgloss.Color("58")),
-		currentMatch:    lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")),
-		selectionStyle:  lipgloss.NewStyle().Background(lipgloss.Color("240")),
-		paletteStyle:    lipgloss.NewStyle().Background(lipgloss.Color("236")).Padding(1, 2),
-		paletteInput:    lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("15")).Padding(0, 1),
-		paletteActive:   lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")).Padding(0, 1),
-		paletteShortcut: lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
+		buf:              buffer.NewBuffer(),
+		cursor:           buffer.NewCursor(),
+		viewport:         renderer.NewViewport(80, 24),
+		undoStack:        buffer.NewUndoStack(),
+		clipboard:        clipboard.New(),
+		filename:         "",
+		modified:         false,
+		mode:             ModeWelcome,
+		language:         "",
+		highlighter:      highlight.NewHighlighter(highlight.ThemeDark),
+		selStart:         -1,
+		selEnd:           -1,
+		statusStyle:      lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252")).Padding(0, 1),
+		statusModified:   lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
+		statusNormal:     lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
+		confirmStyle:     lipgloss.NewStyle().Background(lipgloss.Color("240")).Padding(1, 2),
+		confirmBtnStyle:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")),
+		lineNumStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
+		searchStyle:      lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("252")).Padding(0, 1),
+		matchStyle:       lipgloss.NewStyle().Background(lipgloss.Color("58")),
+		currentMatch:     lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")),
+		selectionStyle:   lipgloss.NewStyle().Background(lipgloss.Color("240")),
+		paletteStyle:     lipgloss.NewStyle().Background(lipgloss.Color("236")).Padding(1, 2),
+		paletteInput:     lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("15")).Padding(0, 1),
+		paletteActive:    lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")).Padding(0, 1),
+		paletteShortcut:  lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
 		cursorExtraStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
 		indentGuideStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("236")),
 	}

@@ -2,9 +2,9 @@ package buffer
 
 // Operation represents a reversible edit operation.
 type Operation struct {
-	Type   string // "insert" or "delete"
-	Pos    int    // Position in the logical text
-	Text   string // Text inserted or deleted
+	Type string // "insert" or "delete"
+	Pos  int    // Position in the logical text
+	Text string // Text inserted or deleted
 }
 
 // UndoStack provides unlimited undo/redo for buffer operations.

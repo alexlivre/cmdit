@@ -12,10 +12,10 @@ import (
 
 // Theme names.
 const (
-	ThemeDark         = "dark"
-	ThemeLight        = "light"
-	ThemeMonokai      = "monokai"
-	ThemeDracula      = "dracula"
+	ThemeDark          = "dark"
+	ThemeLight         = "light"
+	ThemeMonokai       = "monokai"
+	ThemeDracula       = "dracula"
 	ThemeSolarizedDark = "solarized-dark"
 )
 

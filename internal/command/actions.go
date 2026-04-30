@@ -7,8 +7,8 @@ import (
 
 // Action represents a registered command.
 type Action struct {
-	ID      string
-	Label   string
+	ID       string
+	Label    string
 	Shortcut string
 }
 
