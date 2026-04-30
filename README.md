@@ -64,7 +64,7 @@ Um único binário, zero dependências.
 
 ```bash
 # Baixe o binário para sua plataforma em:
-# https://github.com/alexb/cmdit/releases
+# https://github.com/alexlivre/cmdit/releases
 
 # Linux/macOS
 chmod +x cmdit
@@ -77,13 +77,13 @@ sudo mv cmdit /usr/local/bin/
 ### Go Install
 
 ```bash
-go install github.com/alexb/cmdit/cmd/cmdit@latest
+go install github.com/alexlivre/cmdit/cmd/cmdit@latest
 ```
 
 ### Build from source
 
 ```bash
-git clone https://github.com/alexb/cmdit.git
+git clone https://github.com/alexlivre/cmdit.git
 cd cmdit
 go build -o cmdit ./cmd/cmdit
 ```
