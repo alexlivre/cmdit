@@ -137,10 +137,12 @@ func (tm *TabManager) delegateToEditor(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tm.tabs[tm.activeIdx].Editor = ed
 			tm.tabs[tm.activeIdx].Name = tm.tabName(ed)
 
+			// Check if the editor requests the tab to be closed (e.g., after confirm dialog)
 			if ed.CloseRequested() {
 				ed.SaveRecentFiles()
 				tm.closeTab(tm.activeIdx)
-				return tm, nil
+				// Propagate any command from the editor (e.g., tea.Quit if last tab)
+				return tm, cmd
 			}
 		}
 	}
@@ -234,13 +236,8 @@ func (tm *TabManager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return tm, tea.Quit
 
-	case key == "ctrl+tab":
+	case key == "ctrl+tab", key == "ctrl+v":
 		tm.nextTab()
-		return tm, nil
-
-	// Ctrl+Shift+Tab goes to previous tab
-	case key == "ctrl+shift+tab":
-		tm.prevTab()
 		return tm, nil
 
 	// Ctrl+1 through Ctrl+9: go to specific tab
@@ -277,6 +274,7 @@ func (tm *TabManager) closeCurrentTab() (tea.Model, tea.Cmd) {
 		return tm, nil
 	}
 
+	tm.tabs[tm.activeIdx].Editor.SaveRecentFiles()
 	return tm.closeTabHelper(tm.activeIdx)
 }
 
@@ -294,6 +292,7 @@ func (tm *TabManager) closeTabHelper(idx int) (tea.Model, tea.Cmd) {
 
 	// Adjust active index
 	if len(tm.tabs) == 0 {
+		// No more tabs → signal quit
 		return tm, tea.Quit
 	}
 	if tm.activeIdx >= len(tm.tabs) {
