@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 8: Power Features
+
+- **Tabs** — `Ctrl+T` opens a new tab, `Ctrl+W` closes the current tab (with confirmation if modified), `Ctrl+Tab` cycles tabs, `Ctrl+1-9` jumps to a specific tab. Tab bar shows filename and modified indicator (●). New `internal/tabs/` package with `TabManager` implementing `tea.Model`.
+- **Multi-cursor editing** — `Ctrl+D` adds the next occurrence of the word under the cursor as an extra cursor, `Escape` clears all extra cursors. Typing, backspace, delete, enter, and tab work across all cursors simultaneously. Status bar shows cursor count.
+- **Indent guides** — Subtle vertical lines (│) at each 4-space indent level, rendered in the left margin. Helps visualize code block hierarchy.
+- **Splits** — `Ctrl+\` creates a horizontal split with a new `TabManager` on the right. Click to focus a pane, `Ctrl+\` toggles focus. Active border highlighted in orange. New `SplitContainer` in `internal/tabs/` supports single-pane and split modes.
+- **LSP client** — New `internal/lsp/` package with JSON-RPC 2.0 client over stdio. Automatically starts `gopls` for Go files (extensible to Python, Rust, TypeScript). Sends `textDocument/didChange` on every edit. Receives `publishDiagnostics` and shows error (✗) and warning (⚠) counts in the status bar.
+
+### Changed
+
+- **Refactored editor** — `editor.go` split into 4 files: `editor.go` (Model, core), `view.go` (rendering), `keys.go` (key dispatch), `actions.go` (commands). Reduced from 1613 lines to ~650 + 440 + 700 + 260.
+- **Architecture** — `main.go` now creates a `SplitContainer` wrapping a `TabManager` wrapping `editor.Model`. Container hierarchy: `SplitContainer` → `TabManager` → `editor.Model`.
+
 ## [0.2.0] — 2026-04-26
 
 ### Added
