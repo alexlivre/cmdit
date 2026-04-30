@@ -41,14 +41,16 @@ Um único binário, zero dependências.
 - ✅ **Auto-save** — Salva automaticamente a cada 30 segundos.
 - ✅ **Tela de boas-vindas** — Mostra arquivos recentes ao abrir sem arquivo.
 - ✅ **Diálogo de confirmação** — Avisa ao sair se houver alterações não salvas.
+- ✅ **Abas** — Ctrl+T nova aba, Ctrl+W fecha, Ctrl+Tab alterna, Ctrl+1-9 salta. Indicador ● para arquivos modificados.
+- ✅ **Múltiplos cursores** — Ctrl+D adiciona cursor na próxima ocorrência da palavra, Escape limpa. Edição simultânea em todos os cursores.
+- ✅ **Splits** — Ctrl+\ divide a tela horizontalmente. Clique para focar painel, Ctrl+\ alterna foco.
+- ✅ **Indent guides** — Linhas verticais sutis nos níveis de indentação.
+- ✅ **LSP client** — Inicia automaticamente gopls para Go. Diagnósticos de erros e warnings na barra de status. Extensível a Python, Rust, TypeScript.
 - ✅ **Single binary** — Um arquivo. Copia e roda. Zero dependências.
 - ✅ **Cross-platform** — Windows, Linux, macOS. Desktop e servidor SSH.
 
-### 📋 Planejado (v2)
+### 📋 Planejado (v3)
 
-- 🔲 Múltiplos cursores
-- 🔲 Abas e splits
-- 🔲 LSP nativo (autocomplete, go-to-definition)
 - 🔲 Treesitter para syntax highlighting preciso
 - 🔲 Plugins em Lua
 - 🔲 Vim keymap opcional via plugin
@@ -114,6 +116,16 @@ cmdit
 | `F2` | Renomear arquivo |
 | `Ctrl+Q` | Sair |
 
+### Abas e Splits
+
+| Atalho | Ação |
+|--------|------|
+| `Ctrl+T` | Nova aba |
+| `Ctrl+W` | Fechar aba |
+| `Ctrl+Tab` | Próxima aba |
+| `Ctrl+1-9` | Ir para aba N |
+| `Ctrl+\` | Criar/alternar split |
+
 ### Edição
 
 | Atalho | Ação |
@@ -127,6 +139,8 @@ cmdit
 | `Backspace` | Apagar caractere à esquerda |
 | `Delete` | Apagar caractere à direita |
 | `Tab` | Inserir 4 espaços |
+| `Ctrl+D` | Adicionar cursor (próx. ocorrência) |
+| `Escape` | Limpar cursores extras |
 
 ### Navegação
 
@@ -168,7 +182,10 @@ cmdit
 | Syntax Highlight | ✅ | ✅ | ✅ | ✅ | ✅ |
 | File Picker | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Auto-save | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Welcome Screen | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Tabs | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Splits | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Multi-cursor | ✅ | ❌ | ❌ | ✅ | ✅ |
+| LSP nativo | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Single Binary | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Curva de aprendizado | 🟢 segundos | 🔴 meses | 🟢 segundos | 🟡 dias | 🟢 minutos |
 
@@ -178,18 +195,24 @@ cmdit
 
 ```
 cmdit/
-├── cmd/cmdit/main.go            # Entry point
+├── cmd/cmdit/main.go            # Entry point (SplitContainer → TabManager → editor.Model)
 ├── internal/
 │   ├── buffer/                  # Gap buffer + cursor + undo stack
-│   │   ├── buffer.go            # Estrutura de dados gap buffer
-│   │   ├── cursor.go            # Posição do cursor (linha, coluna)
-│   │   └── undo.go              # Undo/Redo stack
-│   ├── clipboard/               # Clipboard interno (OSC52 planejado)
+│   ├── clipboard/               # Clipboard interno
 │   ├── command/                 # Command palette + action registry
 │   ├── editor/                  # Modelo Bubble Tea principal
-│   ├── fileio/                  # Load/Save arquivos
+│   │   ├── editor.go            # Model, Init, Update, helpers
+│   │   ├── view.go              # View + renderização
+│   │   ├── keys.go              # Key dispatch + modos
+│   │   ├── actions.go           # Comandos (save, undo, clipboard, etc.)
+│   │   └── lsp_integration.go   # Integração LSP
+│   ├── fileio/                  # Load/Save/Rename arquivos
 │   ├── highlight/               # Syntax highlighting via Chroma
-│   └── renderer/                # Viewport (scroll, resize)
+│   ├── lsp/                     # Cliente LSP (JSON-RPC 2.0)
+│   ├── renderer/                # Viewport (scroll, resize)
+│   └── tabs/                    # Abas e splits
+│       ├── tabmanager.go        # TabManager (container de editor.Model)
+│       └── split.go             # SplitContainer (layout de painéis)
 ├── bin/                         # Binários compilados
 ├── go.mod / go.sum              # Dependências Go
 ├── Makefile                     # Build, test, cross-compile
@@ -261,9 +284,9 @@ make lint
 | 5 | ✅ | Syntax highlighting via Chroma |
 | 6 | ✅ | File picker, welcome screen, recentes |
 | 7 | ✅ | Auto-save, cross-compile, polimento |
-| 8 | 📋 | Múltiplos cursores, abas, splits |
-| 9 | 📋 | LSP client nativo |
-| 10 | 📋 | Plugins Lua + marketplace |
+| 8 | ✅ | Múltiplos cursores, abas, splits, indent guides, LSP |
+| 9 | 📋 | Plugins Lua + marketplace |
+| 10 | 📋 | Treesitter syntax highlighting |
 
 ---
 
