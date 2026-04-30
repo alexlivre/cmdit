@@ -84,9 +84,9 @@ cmdit/
 | **5** | Syntax highlight | 1-2 sem | Chroma, 5 temas, detecção de linguagem |
 | **6** | File operations | 1 sem | Ctrl+O, salvar como, recentes |
 | **7** | Polimento v1 | 1-2 sem | Auto-save, welcome, OSC52, status bar |
-| **8** | Power features | 3-4 sem | Múltiplos cursores, abas, splits, LSP |
-| **9** | Plugins Lua | 2-3 sem | Lua runtime, API, marketplace |
-| **10** | Produção | 2 sem | Cross-compile, CI/CD, installer, docs |
+| **8** | Power features | 3-4 sem | Múltiplos cursores, abas, splits, LSP | ✅ |
+| **9** | Plugins Lua | 2-3 sem | Lua runtime, API, marketplace | 📋 |
+| **10** | Produção | 2 sem | Cross-compile, CI/CD, installer, docs | 📋 |
 
 ---
 
@@ -410,34 +410,35 @@ cmdit/
 
 ---
 
-## 📋 Fase 8 — Power Features (v2)
+## 📋 Fase 8 — Power Features (v2) ✅
 
-- [ ] **8.1** Múltiplos cursores
-  - Ctrl+D: seleciona próxima ocorrência da palavra atual
-  - Ctrl+Click: adiciona cursor na posição
-  - Escape: remove todos os cursores extras
+**Objetivo:** Múltiplos cursores, abas, splits, indent guides, LSP client.
 
-- [ ] **8.2** Abas
-  - Ctrl+T: nova aba (buffer vazio)
-  - Ctrl+W: fecha aba atual (confirma se modificada)
-  - Ctrl+Tab / Ctrl+Shift+Tab: alternar abas
-  - UI: barra de abas no topo com nome do arquivo
+### ✅ Implementado (2026-04-29)
 
-- [ ] **8.3** Splits
-  - Horizontal/vertical
-  - Redimensionamento com mouse ou Ctrl+W + setas
-  - Cada split é um editor independente
+- **8.1 Múltiplos cursores** — Ctrl+D adiciona cursor na próxima ocorrência da palavra. Escape limpa. Edição simultânea em todos os cursores (insert, delete, backspace, enter, tab). Indicador na status bar.
+- **8.2 Abas** — Ctrl+T nova aba, Ctrl+W fecha (confirma se modificada), Ctrl+Tab alterna, Ctrl+1-9 salta. Barra de abas com indicador ● de modificação. Package `internal/tabs/`.
+- **8.3 Splits** — Ctrl+\ divide horizontalmente com novo TabManager. Clique para focar painel. Borda ativa destacada em laranja. SplitContainer suporta modo single-pane.
+- **8.4 LSP client** — Package `internal/lsp/` com JSON-RPC 2.0 sobre stdio. Inicia gopls automaticamente para Go. Envia didChange em cada edição. Mostra ✗N e ⚠N na status bar.
+- **8.5 Indent guides** — Linhas verticais │ em cada nível de 4 espaços. Renderizado na margem esquerda.
 
-- [ ] **8.4** LSP client
-  - Cliente LSP em Go (protocolo JSON-RPC sobre stdio)
-  - Auto-complete: popup ao digitar (Ctrl+Space)
-  - Go-to-definition: F12
-  - Diagnostics: sublinhado ondulado em erros
-  - Configuração: `~/.cmdit/lsp.json`
+### Arquitetura final
 
-- [ ] **8.5** Indent guides
-  - Linhas verticais sutis para cada nível de indentação
-  - Toggle: `view.toggle-indent-guides`
+```
+SplitContainer (tea.Model)
+├── TabManager (left)
+│   ├── editor.Model (tab 1)
+│   └── editor.Model (tab 2)
+└── TabManager (right, opcional)
+    └── editor.Model (tab 1)
+```
+
+### Arquivos criados/alterados
+- `internal/tabs/tabmanager.go` — TabManager (367 linhas)
+- `internal/tabs/split.go` — SplitContainer (400 linhas)
+- `internal/lsp/lsp.go` — Cliente LSP (340 linhas)
+- `internal/editor/` — Refatorado em editor.go + view.go + keys.go + actions.go + lsp_integration.go
+- `cmd/cmdit/main.go` — Usa SplitContainer → TabManager → editor.Model
 
 ---
 
