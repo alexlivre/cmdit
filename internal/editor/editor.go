@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +17,7 @@ import (
 	"github.com/alexb/cmdit/internal/command"
 	"github.com/alexb/cmdit/internal/fileio"
 	"github.com/alexb/cmdit/internal/highlight"
+	"github.com/alexb/cmdit/internal/lsp"
 	"github.com/alexb/cmdit/internal/renderer"
 )
 
@@ -34,11 +36,31 @@ const (
 	ModeWelcome
 )
 
+// ConfirmAction identifies which confirmation dialog is active.
 type ConfirmAction int
 
 const (
-	ConfirmQuit ConfirmAction = iota
+	ConfirmQuit     ConfirmAction = iota
+	ConfirmCloseTab
 )
+
+// CloseRequested returns true when the editor wants its container to close this tab.
+func (m *Model) CloseRequested() bool {
+	return m.closeRequested
+}
+
+// ConfirmCloseTabMode puts the editor in confirmation mode for closing a tab.
+func (m *Model) ConfirmCloseTabMode() {
+	m.mode = ModeConfirm
+	m.confirmAction = ConfirmCloseTab
+}
+
+// EditorCursor holds a cursor with its resolved gap position for multi-cursor editing.
+type EditorCursor struct {
+	Line   int
+	Col    int
+	GapPos int
+}
 
 // Model is the main Bubble Tea model for the editor.
 type Model struct {
@@ -87,6 +109,18 @@ type Model struct {
 	renameInput string
 	renameError string
 
+	// Multi-cursor state
+	extraCursors []EditorCursor
+
+	// Close request from container (tab/split manager)
+	closeRequested bool
+
+	// LSP integration
+	lspClient       *lsp.Client
+	diagnostics     map[int][]lsp.Diagnostic // line → diagnostics
+	lspVersion      int
+	lspDiagnosticsMu sync.Mutex
+
 	width  int
 	height int
 
@@ -105,6 +139,8 @@ type Model struct {
 	paletteInput    lipgloss.Style
 	paletteActive   lipgloss.Style
 	paletteShortcut lipgloss.Style
+	cursorExtraStyle lipgloss.Style
+	indentGuideStyle lipgloss.Style
 }
 
 // New creates a new editor model.
@@ -136,6 +172,8 @@ func New() *Model {
 		paletteInput:    lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("15")).Padding(0, 1),
 		paletteActive:   lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")).Padding(0, 1),
 		paletteShortcut: lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
+		cursorExtraStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
+		indentGuideStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("236")),
 	}
 	m.registerActions()
 	m.loadRecentFiles()
@@ -211,554 +249,37 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) View() string {
-	if m.mode == ModeWelcome {
-		return m.renderWelcome()
-	}
-	if m.mode == ModePalette {
-		return m.renderPalette()
-	}
-	if m.mode == ModeFilePicker {
-		return m.renderFilePicker()
-	}
-	if m.mode == ModeSaveAs {
-		return m.renderSaveAs()
-	}
-	if m.mode == ModeConfirm {
-		return m.renderConfirm()
-	}
+// --- Accessors for tab/split containers ---
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		m.renderContent(),
-		m.renderStatus(),
-	)
+// Modified returns whether the buffer has unsaved changes.
+func (m *Model) Modified() bool { return m.modified }
+
+// Filename returns the current file path.
+func (m *Model) Filename() string { return m.filename }
+
+// Mode returns the current editor mode.
+func (m *Model) CurrentMode() Mode { return m.mode }
+
+// Buffer returns the underlying buffer (for external access).
+func (m *Model) Buffer() *buffer.Buffer { return m.buf }
+
+// SetFilename sets the filename (used by tab renaming).
+func (m *Model) SetFilename(name string) {
+	m.filename = name
+	m.language = highlight.DetectLanguage(name)
 }
 
-// renderContent renders the text content area with line numbers and search bar.
-func (m *Model) renderContent() string {
-	var parts []string
+// ResetMode forces the editor back to Normal mode (used when switching tabs).
+func (m *Model) ResetMode() { m.mode = ModeNormal }
 
-	// Search/replace bar
-	if m.mode == ModeSearch || m.mode == ModeReplace {
-		parts = append(parts, m.renderSearchBar())
+// Save exports the save operation for the tab container.
+func (m *Model) Save() {
+	if m.filename == "" {
+		m.filename = "untitled.txt"
 	}
-	// Rename bar
-	if m.mode == ModeRename {
-		parts = append(parts, m.renderRenameBar())
+	if err := fileio.Save(m.filename, m.buf); err == nil {
+		m.modified = false
 	}
-
-	// Main content
-	lines := m.buf.Lines()
-	lineNumWidth := m.lineNumberWidth()
-	contentHeight := m.viewport.Height()
-	if m.mode == ModeSearch || m.mode == ModeReplace {
-		contentHeight -= 1
-	}
-	if m.mode == ModeRename {
-		contentHeight -= 1
-	}
-
-	var visibleLines []string
-	for i := m.viewport.ScrollY(); i < len(lines) && i < m.viewport.ScrollY()+contentHeight; i++ {
-		lineNum := fmt.Sprintf("%*d ", lineNumWidth, i+1)
-		styledLineNum := m.lineNumStyle.Render(lineNum)
-
-		// Apply syntax highlighting
-		segments := m.highlighter.HighlightLine(lines[i], m.language)
-		lineText := highlight.RenderSegments(segments)
-
-		// Apply search highlighting on top
-		if len(m.searchMatches) > 0 {
-			lineText = m.applySearchHighlight(lineText, i)
-		}
-
-		// Horizontal scroll
-		if m.viewport.ScrollX() > 0 && m.viewport.ScrollX() < len(lineText) {
-			lineText = lineText[m.viewport.ScrollX():]
-		}
-		if len(lineText) > m.viewport.Width()-lineNumWidth-1 {
-			lineText = lineText[:m.viewport.Width()-lineNumWidth-1]
-		}
-
-		visibleLines = append(visibleLines, styledLineNum+lineText)
-	}
-
-	content := strings.Join(visibleLines, "\n")
-	contentStyle := lipgloss.NewStyle().
-		Width(m.viewport.Width()).
-		Height(contentHeight)
-
-	parts = append(parts, contentStyle.Render(content))
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
-}
-
-func (m *Model) lineNumberWidth() int {
-	count := m.buf.LineCount()
-	if count < 10 {
-		return 2
-	}
-	if count < 100 {
-		return 3
-	}
-	if count < 1000 {
-		return 4
-	}
-	return 5
-}
-
-// --- Key handling ---
-
-func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.mode == ModeWelcome {
-		return m.handleWelcomeKey(msg)
-	}
-	if m.mode == ModePalette {
-		return m.handlePaletteKey(msg)
-	}
-	if m.mode == ModeFilePicker {
-		return m.handleFilePickerKey(msg)
-	}
-	if m.mode == ModeSaveAs {
-		return m.handleSaveAsKey(msg)
-	}
-	if m.mode == ModeRename {
-		return m.handleRenameKey(msg)
-	}
-	// In search/replace mode, handle input differently
-	if m.mode == ModeSearch || m.mode == ModeReplace {
-		return m.handleSearchKey(msg)
-	}
-
-	if m.mode == ModeConfirm {
-		return m.handleConfirmKey(msg)
-	}
-
-	switch msg.String() {
-	case "ctrl+p":
-		m.enterPalette()
-		return m, nil
-
-	case "ctrl+o":
-		m.enterFilePicker()
-		return m, nil
-
-	case "f2":
-		m.enterRename()
-		return m, nil
-
-	case "f3":
-		m.enterSaveAs()
-		return m, nil
-
-	case "ctrl+q":
-		if m.modified {
-			m.mode = ModeConfirm
-			m.confirmAction = ConfirmQuit
-			return m, nil
-		}
-		return m, tea.Quit
-
-	case "ctrl+s":
-		m.save()
-		return m, nil
-
-	// Undo/Redo
-	case "ctrl+z":
-		m.undo()
-		return m, nil
-	case "ctrl+y":
-		m.redo()
-		return m, nil
-
-	// Clipboard
-	case "ctrl+c":
-		m.copy()
-		return m, nil
-	case "ctrl+x":
-		m.cut()
-		return m, nil
-	case "ctrl+v":
-		m.paste()
-		return m, nil
-
-	// Select all
-	case "ctrl+a":
-		m.selStart = 0
-		m.selEnd = m.buf.Len()
-		return m, nil
-
-	// Search/Replace
-	case "ctrl+f":
-		m.mode = ModeSearch
-		m.searchQuery = ""
-		m.searchMatches = nil
-		m.searchCurrent = 0
-		return m, nil
-
-	case "ctrl+h":
-		m.mode = ModeReplace
-		m.searchQuery = ""
-		m.replaceQuery = ""
-		m.searchMatches = nil
-		m.searchCurrent = 0
-		return m, nil
-
-	case "backspace":
-		m.clearSelection()
-		if m.buf.GapPosition() == 0 {
-			return m, nil
-		}
-		// Record undo operation
-		r := m.buf.RuneAt(m.buf.GapPosition() - 1)
-		m.undoStack.Push(buffer.Operation{
-			Type: "insert",
-			Pos:  m.buf.GapPosition() - 1,
-			Text: string(r),
-		})
-		if m.buf.Backspace() {
-			m.cursor.Col--
-			if m.cursor.Col < 0 {
-				m.cursor.Col = 0
-			}
-			m.modified = true
-			m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-		}
-		return m, nil
-
-	case "delete":
-		m.clearSelection()
-		if m.buf.GapPosition() >= m.buf.Len() {
-			return m, nil
-		}
-		r := m.buf.RuneAt(m.buf.GapPosition())
-		m.undoStack.Push(buffer.Operation{
-			Type: "insert",
-			Pos:  m.buf.GapPosition(),
-			Text: string(r),
-		})
-		if m.buf.DeleteForward() {
-			m.modified = true
-		}
-		return m, nil
-
-	case "enter":
-		m.clearSelection()
-		m.insertText("\n")
-		m.cursor.Line++
-		m.cursor.Col = 0
-		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-		return m, nil
-
-	case "tab":
-		m.clearSelection()
-		m.insertText("    ")
-		m.cursor.Col += 4
-		return m, nil
-
-	// Navigation
-	case "up":
-		m.clearSelection()
-		m.moveCursorUp()
-		return m, nil
-	case "down":
-		m.clearSelection()
-		m.moveCursorDown()
-		return m, nil
-	case "left":
-		m.clearSelection()
-		m.moveCursorLeft()
-		return m, nil
-	case "right":
-		m.clearSelection()
-		m.moveCursorRight()
-		return m, nil
-	case "home":
-		m.clearSelection()
-		m.cursor.Col = 0
-		m.syncGapToCursor()
-		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-		return m, nil
-	case "end":
-		m.clearSelection()
-		lineText := m.currentLineText()
-		m.cursor.Col = len(lineText)
-		m.syncGapToCursor()
-		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-		return m, nil
-	case "ctrl+home":
-		m.clearSelection()
-		m.cursor.SetPos(0, 0)
-		m.syncGapToCursor()
-		m.viewport.EnsureVisible(0, 0)
-		return m, nil
-	case "ctrl+end":
-		m.clearSelection()
-		lastLine := m.buf.LineCount() - 1
-		lastLineText := m.lineText(lastLine)
-		m.cursor.SetPos(lastLine, len(lastLineText))
-		m.syncGapToCursor()
-		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-		return m, nil
-	case "ctrl+left":
-		m.clearSelection()
-		m.moveCursorWordLeft()
-		return m, nil
-	case "ctrl+right":
-		m.clearSelection()
-		m.moveCursorWordRight()
-		return m, nil
-
-	default:
-		m.clearSelection()
-		if len(msg.Runes) > 0 {
-			for _, r := range msg.Runes {
-				if r >= 32 {
-					m.insertText(string(r))
-					m.cursor.Col++
-				}
-			}
-			m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-		}
-		return m, nil
-	}
-}
-
-// --- Search input handling ---
-
-func (m *Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.mode = ModeNormal
-		m.searchMatches = nil
-		return m, nil
-
-	case "enter":
-		m.doSearch()
-		if len(m.searchMatches) > 0 {
-			m.navigateToMatch(0)
-		}
-		if m.mode == ModeReplace {
-			m.doReplace()
-		}
-		return m, nil
-
-	case "tab":
-		if m.mode == ModeReplace {
-			// Toggle between search and replace fields
-			// For now, just keep the mode
-		}
-		return m, nil
-
-	case "backspace":
-		if m.mode == ModeReplace && m.replaceQuery != "" {
-			m.replaceQuery = m.replaceQuery[:len(m.replaceQuery)-1]
-		} else if m.searchQuery != "" {
-			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
-		}
-		return m, nil
-
-	default:
-		if len(msg.Runes) > 0 {
-			if m.mode == ModeReplace && m.searchQuery != "" && m.replaceQuery == "" && msg.Runes[0] == '\t' {
-				// That was tab, already handled
-			} else if m.mode == ModeReplace && msg.Runes[0] >= 32 {
-				// Find which field is active (simplified: if searchQuery done, type replace)
-				// For simplicity, just append to replace or search
-				if len(m.searchMatches) > 0 {
-					m.replaceQuery += string(msg.Runes)
-				} else {
-					m.searchQuery += string(msg.Runes)
-				}
-			} else if msg.Runes[0] >= 32 {
-				m.searchQuery += string(msg.Runes)
-			}
-		}
-		return m, nil
-	}
-}
-
-func (m *Model) doSearch() {
-	if m.searchQuery == "" {
-		return
-	}
-	m.lastSearch = m.searchQuery
-
-	content := m.buf.String()
-	m.searchMatches = nil
-
-	query := strings.ToLower(m.searchQuery)
-	contentLower := strings.ToLower(content)
-
-	for i := 0; i <= len(content)-len(query); i++ {
-		if contentLower[i:i+len(query)] == query {
-			m.searchMatches = append(m.searchMatches, i)
-		}
-	}
-	m.searchCurrent = 0
-}
-
-func (m *Model) doReplace() {
-	if len(m.searchMatches) == 0 || m.replaceQuery == "" {
-		return
-	}
-
-	// Replace current match
-	pos := m.searchMatches[m.searchCurrent]
-	// Remove selection, insert replacement
-	m.moveGapTo(pos)
-	for i := 0; i < len(m.searchQuery); i++ {
-		m.buf.DeleteForward()
-	}
-	m.buf.InsertString(m.replaceQuery)
-	m.modified = true
-
-	// Update match positions
-	m.doSearch()
-}
-
-// --- Undo/Redo ---
-
-func (m *Model) undo() {
-	op, ok := m.undoStack.Undo()
-	if !ok {
-		return
-	}
-
-	m.moveGapTo(op.Pos)
-	switch op.Type {
-	case "insert":
-		m.buf.InsertString(op.Text)
-	case "delete":
-		for i := 0; i < len(op.Text); i++ {
-			m.buf.DeleteForward()
-		}
-	}
-	m.modified = true
-	m.cursor.Line, m.cursor.Col = m.buf.LineCol(m.buf.GapPosition())
-	m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-}
-
-func (m *Model) redo() {
-	op, ok := m.undoStack.Redo()
-	if !ok {
-		return
-	}
-
-	m.moveGapTo(op.Pos)
-	// Redo applies the INVERSE of the stored operation (re-doing the original action).
-	switch op.Type {
-	case "insert":
-		// Reverse of stored "insert" = delete
-		for i := 0; i < len(op.Text); i++ {
-			m.buf.DeleteForward()
-		}
-	case "delete":
-		// Reverse of stored "delete" = insert
-		m.buf.InsertString(op.Text)
-	}
-	m.modified = true
-	m.cursor.Line, m.cursor.Col = m.buf.LineCol(m.buf.GapPosition())
-	m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-}
-
-// --- Clipboard ---
-
-func (m *Model) copy() {
-	if m.hasSelection() {
-		text := m.getSelectedText()
-		m.clipboard.Copy(text)
-	} else {
-		// Copy current line
-		text := m.currentLineText()
-		m.clipboard.Copy(text)
-	}
-	m.selStart = -1
-	m.selEnd = -1
-}
-
-func (m *Model) cut() {
-	if m.hasSelection() {
-		m.copy()
-		m.deleteSelection()
-	} else {
-		// Cut current line
-		m.clipboard.Copy(m.currentLineText())
-		// Delete the line
-		m.moveGapTo(m.buf.LineStart(m.cursor.Line))
-		lineEnd := m.buf.LineStart(m.cursor.Line + 1)
-		for i := m.buf.LineStart(m.cursor.Line); i < lineEnd && m.buf.GapPosition() < m.buf.Len(); i++ {
-			m.buf.DeleteForward()
-		}
-		m.modified = true
-	}
-}
-
-func (m *Model) paste() {
-	if m.clipboard.HasText() {
-		text := m.clipboard.Paste()
-		m.undoStack.Push(buffer.Operation{
-			Type: "delete",
-			Pos:  m.buf.GapPosition(),
-			Text: text,
-		})
-		m.buf.InsertString(text)
-		m.cursor.Col += len(text)
-		m.modified = true
-		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
-	}
-}
-
-// --- Selection ---
-
-func (m *Model) hasSelection() bool {
-	return m.selStart >= 0 && m.selEnd >= 0 && m.selStart != m.selEnd
-}
-
-func (m *Model) getSelectedText() string {
-	if !m.hasSelection() {
-		return ""
-	}
-	start := m.selStart
-	end := m.selEnd
-	if start > end {
-		start, end = end, start
-	}
-	var sb strings.Builder
-	for i := start; i < end; i++ {
-		sb.WriteRune(m.buf.RuneAt(i))
-	}
-	return sb.String()
-}
-
-func (m *Model) clearSelection() {
-	m.selStart = -1
-	m.selEnd = -1
-}
-
-func (m *Model) deleteSelection() {
-	if !m.hasSelection() {
-		return
-	}
-	text := m.getSelectedText()
-	m.undoStack.Push(buffer.Operation{
-		Type: "insert",
-		Pos:  m.selStart,
-		Text: text,
-	})
-
-	start := m.selStart
-	end := m.selEnd
-	if start > end {
-		start, end = end, start
-	}
-
-	m.moveGapTo(start)
-	for i := 0; i < end-start; i++ {
-		m.buf.DeleteForward()
-	}
-	m.selStart = -1
-	m.selEnd = -1
-	m.modified = true
 }
 
 // --- Helpers ---
@@ -771,6 +292,34 @@ func (m *Model) insertText(text string) {
 	})
 	m.buf.InsertString(text)
 	m.modified = true
+	m.sendDidChange()
+}
+
+func (m *Model) insertTextAtAllCursors(text string) {
+	if len(m.extraCursors) == 0 {
+		m.insertText(text)
+		return
+	}
+
+	all := m.allCursors()
+	// Process from end to start to preserve positions
+	for i := len(all) - 1; i >= 0; i-- {
+		m.moveGapTo(all[i].GapPos)
+		m.undoStack.Push(buffer.Operation{
+			Type: "delete",
+			Pos:  all[i].GapPos,
+			Text: text,
+		})
+		m.buf.InsertString(text)
+	}
+
+	// Update cursor and extra cursors
+	m.cursor.Col += len(text)
+	for i := range m.extraCursors {
+		m.extraCursors[i].Col += len(text)
+	}
+	m.modified = true
+	m.sendDidChange()
 }
 
 func (m *Model) moveGapTo(pos int) {
@@ -786,52 +335,56 @@ func (m *Model) moveGapTo(pos int) {
 	}
 }
 
-// --- Mouse ---
-
-func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case msg.Button == tea.MouseButtonWheelUp && msg.Action == tea.MouseActionPress:
-		m.viewport.ScrollUp(3)
-		return m, nil
-
-	case msg.Button == tea.MouseButtonWheelDown && msg.Action == tea.MouseActionPress:
-		m.viewport.ScrollDown(3)
-		return m, nil
-
-	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
-		m.clearSelection()
-		lineNumWidth := m.lineNumberWidth()
-		clickLine := m.viewport.ScrollY() + msg.Y
-		clickCol := msg.X - lineNumWidth - 1 + m.viewport.ScrollX()
-		if clickCol < 0 {
-			clickCol = 0
-		}
-		m.cursor.SetPos(clickLine, clickCol)
-		m.clampCursor()
-		m.syncGapToCursor()
-		return m, nil
-	}
-	return m, nil
+func (m *Model) syncGapToCursor() {
+	targetIndex := m.buf.LineStart(m.cursor.Line) + m.cursor.Col
+	m.moveGapTo(targetIndex)
 }
 
-// --- Confirmation ---
-
-func (m *Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "s", "S":
-		if m.confirmAction == ConfirmQuit {
-			m.save()
-			return m, tea.Quit
-		}
-	case "d", "D", "n", "N":
-		if m.confirmAction == ConfirmQuit {
-			return m, tea.Quit
-		}
-	case "c", "C", "esc":
-		m.mode = ModeNormal
-		return m, nil
+func (m *Model) clampCursor() {
+	maxLine := m.buf.LineCount() - 1
+	if m.cursor.Line > maxLine {
+		m.cursor.Line = maxLine
 	}
-	return m, nil
+	if m.cursor.Line < 0 {
+		m.cursor.Line = 0
+	}
+	m.clampCursorCol()
+}
+
+func (m *Model) clampCursorCol() {
+	lineText := m.currentLineText()
+	if m.cursor.Col > len(lineText) {
+		m.cursor.Col = len(lineText)
+	}
+	if m.cursor.Col < 0 {
+		m.cursor.Col = 0
+	}
+}
+
+func (m *Model) currentLineText() string {
+	return m.lineText(m.cursor.Line)
+}
+
+func (m *Model) lineText(line int) string {
+	lines := m.buf.Lines()
+	if line < 0 || line >= len(lines) {
+		return ""
+	}
+	return lines[line]
+}
+
+func (m *Model) lineNumberWidth() int {
+	count := m.buf.LineCount()
+	if count < 10 {
+		return 2
+	}
+	if count < 100 {
+		return 3
+	}
+	if count < 1000 {
+		return 4
+	}
+	return 5
 }
 
 // --- Cursor movement ---
@@ -921,656 +474,29 @@ func isSpace(r rune) bool {
 	return r == ' ' || r == '\t'
 }
 
-func (m *Model) clampCursor() {
-	maxLine := m.buf.LineCount() - 1
-	if m.cursor.Line > maxLine {
-		m.cursor.Line = maxLine
-	}
-	if m.cursor.Line < 0 {
-		m.cursor.Line = 0
-	}
-	m.clampCursorCol()
-}
+// --- Auto-save ---
 
-func (m *Model) clampCursorCol() {
-	lineText := m.currentLineText()
-	if m.cursor.Col > len(lineText) {
-		m.cursor.Col = len(lineText)
-	}
-	if m.cursor.Col < 0 {
-		m.cursor.Col = 0
-	}
-}
+type autoSaveMsg struct{}
 
-func (m *Model) currentLineText() string {
-	return m.lineText(m.cursor.Line)
-}
-
-func (m *Model) lineText(line int) string {
-	lines := m.buf.Lines()
-	if line < 0 || line >= len(lines) {
-		return ""
-	}
-	return lines[line]
-}
-
-func (m *Model) syncGapToCursor() {
-	targetIndex := m.buf.LineStart(m.cursor.Line) + m.cursor.Col
-	m.moveGapTo(targetIndex)
-}
-
-// --- Search highlighting ---
-
-func (m *Model) applySearchHighlight(lineText string, lineNum int) string {
-	if len(m.searchMatches) == 0 {
-		return lineText
-	}
-
-	lineStart := m.buf.LineStart(lineNum)
-	if lineStart < 0 {
-		return lineText
-	}
-
-	var result strings.Builder
-	pos := 0
-	queryLen := len(m.searchQuery)
-
-	for i := 0; i <= len(lineText)-queryLen; i++ {
-		logicalPos := lineStart + i
-		isMatch := false
-		matchIdx := -1
-
-		for j, matchPos := range m.searchMatches {
-			if matchPos == logicalPos {
-				isMatch = true
-				matchIdx = j
-				break
-			}
-		}
-
-		if isMatch {
-			result.WriteString(lineText[pos:i])
-
-			matchText := lineText[i : i+queryLen]
-			if matchIdx == m.searchCurrent {
-				result.WriteString(m.currentMatch.Render(matchText))
-			} else {
-				result.WriteString(m.matchStyle.Render(matchText))
-			}
-			pos = i + queryLen
-			i += queryLen - 1
-		}
-	}
-	result.WriteString(lineText[pos:])
-	return result.String()
-}
-
-func (m *Model) navigateToMatch(index int) {
-	if index < 0 || index >= len(m.searchMatches) {
-		return
-	}
-	m.searchCurrent = index
-	pos := m.searchMatches[index]
-	line, col := m.buf.LineCol(pos)
-	m.cursor.SetPos(line, col)
-	m.syncGapToCursor()
-	m.viewport.EnsureVisible(line, col)
-}
-
-// --- Search bar rendering ---
-
-func (m *Model) renderSearchBar() string {
-	if m.mode == ModeReplace {
-		s := fmt.Sprintf("Buscar: %s  Substituir: %s", m.searchQuery, m.replaceQuery)
-		if len(m.searchMatches) > 0 {
-			s += fmt.Sprintf("  [%d/%d]", m.searchCurrent+1, len(m.searchMatches))
-		}
-		return m.searchStyle.Render(s)
-	}
-	s := fmt.Sprintf("Buscar: %s", m.searchQuery)
-	if len(m.searchMatches) > 0 {
-		s += fmt.Sprintf("  [%d/%d]", m.searchCurrent+1, len(m.searchMatches))
-	}
-	return m.searchStyle.Render(s)
-}
-
-// --- File operations ---
-
-func (m *Model) save() {
-	if m.filename == "" {
-		m.filename = "untitled.txt"
-	}
-	if err := fileio.Save(m.filename, m.buf); err == nil {
-		m.modified = false
-	}
-}
-
-// --- Status bar ---
-
-func (m *Model) renderStatus() string {
-	fname := m.filename
-	if fname == "" {
-		fname = "[novo]"
-	}
-	modified := ""
-	if m.modified {
-		modified = m.statusModified.Render(" ●")
-	}
-	lang := m.language
-	if lang == "" {
-		lang = "texto"
-	}
-	pos := fmt.Sprintf("L:%d C:%d [%s]", m.cursor.Line+1, m.cursor.Col+1, lang)
-	return m.statusStyle.Render(fname + modified + "  " + pos + "  Ctrl+S Salvar  Ctrl+Q Sair")
-}
-
-// --- Confirm dialog ---
-
-func (m *Model) renderConfirm() string {
-	msg := "Arquivo modificado! Deseja salvar antes de sair?"
-	btns := "\n\n" + m.confirmBtnStyle.Render("[S] Salvar") + "  [D] Descartar  [C] Cancelar"
-	dialog := m.confirmStyle.Render(msg + btns)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
-}
-
-// --- Palette ---
-
-func (m *Model) enterPalette() {
-	m.mode = ModePalette
-	m.paletteQuery = ""
-	m.paletteResult()
-	m.paletteSel = 0
-}
-
-func (m *Model) handlePaletteKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.mode = ModeNormal
-		return m, nil
-
-	case "enter":
-		if m.paletteSel >= 0 && m.paletteSel < len(m.paletteResults) {
-			action := m.paletteResults[m.paletteSel]
-			m.mode = ModeNormal
-			m.executeAction(action.ID)
-		}
-		return m, nil
-
-	case "up":
-		m.paletteSel--
-		if m.paletteSel < 0 {
-			m.paletteSel = len(m.paletteResults) - 1
-		}
-
-	case "down":
-		m.paletteSel++
-		if m.paletteSel >= len(m.paletteResults) {
-			m.paletteSel = 0
-		}
-
-	case "backspace":
-		if len(m.paletteQuery) > 0 {
-			m.paletteQuery = m.paletteQuery[:len(m.paletteQuery)-1]
-			m.paletteResult()
-			m.paletteSel = 0
-		}
-
-	default:
-		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
-			m.paletteQuery += string(msg.Runes)
-			m.paletteResult()
-			m.paletteSel = 0
-		}
-	}
-	return m, nil
-}
-
-func (m *Model) paletteResult() {
-	if m.paletteQuery == "" {
-		m.paletteResults = m.paletteActions
-		return
-	}
-	q := strings.ToLower(m.paletteQuery)
-	var filtered []command.Action
-	for _, a := range m.paletteActions {
-		if strings.Contains(strings.ToLower(a.Label), q) || strings.Contains(strings.ToLower(a.ID), q) {
-			filtered = append(filtered, a)
-		}
-	}
-	m.paletteResults = filtered
-}
-
-func (m *Model) executeAction(id string) {
-	switch id {
-	case "file.save":
-		m.save()
-	case "file.save-as":
-		m.enterSaveAs()
-	case "file.quit":
-		if m.modified {
-			m.mode = ModeConfirm
-			m.confirmAction = ConfirmQuit
-		} else {
-			// Can't quit from here - handled by key handler
-		}
-	case "edit.undo":
-		m.undo()
-	case "edit.redo":
-		m.redo()
-	case "edit.cut":
-		m.cut()
-	case "edit.copy":
-		m.copy()
-	case "edit.paste":
-		m.paste()
-	case "edit.select-all":
-		m.selStart = 0
-		m.selEnd = m.buf.Len()
-	case "search.find":
-		m.mode = ModeSearch
-		m.searchQuery = ""
-		m.searchMatches = nil
-	case "search.replace":
-		m.mode = ModeReplace
-		m.searchQuery = ""
-		m.replaceQuery = ""
-		m.searchMatches = nil
-	case "file.rename":
-		m.enterRename()
-	}
-}
-
-func (m *Model) renderPalette() string {
-	maxItems := 10
-	start := m.paletteSel - 5
-	if start < 0 {
-		start = 0
-	}
-	end := start + maxItems
-	if end > len(m.paletteResults) {
-		end = len(m.paletteResults)
-	}
-
-	var items []string
-	items = append(items, m.paletteInput.Render("> "+m.paletteQuery))
-
-	if len(m.paletteQuery) == 0 {
-		items = append(items, m.paletteShortcut.Render("  Digite para buscar comandos..."))
-	}
-	if len(m.paletteResults) == 0 && len(m.paletteQuery) > 0 {
-		items = append(items, m.paletteShortcut.Render("  Nenhum comando encontrado"))
-	}
-
-	for i := start; i < end; i++ {
-		a := m.paletteResults[i]
-		line := fmt.Sprintf("  %-30s", a.Label)
-		if a.Shortcut != "" {
-			line += " " + m.paletteShortcut.Render(a.Shortcut)
-		}
-		if i == m.paletteSel {
-			items = append(items, m.paletteActive.Render(strings.TrimRight(line, " ")))
-		} else {
-			items = append(items, line)
-		}
-	}
-
-	content := strings.Join(items, "\n")
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		m.paletteStyle.Render(content))
-}
-
-// --- Welcome Screen ---
-
-func (m *Model) renderWelcome() string {
-	logo := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render("  cmdit v0.1.0")
-	subtitle := "Editor de texto para humanos"
-
-	var lines []string
-	lines = append(lines, logo)
-	lines = append(lines, "")
-	lines = append(lines, subtitle)
-	lines = append(lines, "")
-
-	if len(m.recentFiles) > 0 {
-		lines = append(lines, lipgloss.NewStyle().Bold(true).Render("Arquivos recentes:"))
-		for i, f := range m.recentFiles {
-			if i >= 5 {
-				break
-			}
-			lines = append(lines, fmt.Sprintf("  %d. %s", i+1, f))
-		}
-		lines = append(lines, "")
-	}
-
-	lines = append(lines, "Ctrl+O  Abrir arquivo")
-	lines = append(lines, "Ctrl+P  Paleta de comandos")
-	lines = append(lines, "Ctrl+Q  Sair")
-	lines = append(lines, "")
-	lines = append(lines, "Comece a digitar para criar um novo arquivo...")
-
-	content := strings.Join(lines, "\n")
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
-}
-
-func (m *Model) handleWelcomeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "ctrl+q":
-		return m, tea.Quit
-	case "ctrl+o":
-		m.enterFilePicker()
-		return m, nil
-	default:
-		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
-			m.mode = ModeNormal
-			m.handleKey(msg) // Process the character
-			return m, nil
-		}
-	}
-	return m, nil
-}
-
-// --- File Picker ---
-
-func (m *Model) enterFilePicker() {
-	m.mode = ModeFilePicker
-	m.filePickerDir = "."
-	m.filePickerQuery = ""
-	m.loadDirectory()
-	m.filePickerSel = 0
-}
-
-func (m *Model) loadDirectory() {
-	entries, err := os.ReadDir(m.filePickerDir)
-	if err != nil {
-		m.filePickerFiles = nil
-		return
-	}
-	m.filePickerFiles = nil
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() {
-			name += "/"
-		}
-		if m.filePickerQuery == "" || strings.Contains(strings.ToLower(name), strings.ToLower(m.filePickerQuery)) {
-			m.filePickerFiles = append(m.filePickerFiles, name)
-		}
-	}
-}
-
-func (m *Model) handleFilePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.mode = ModeNormal
-		if m.buf.Len() == 0 && m.filename == "" {
-			m.mode = ModeWelcome
-		}
-		return m, nil
-
-	case "enter":
-		if m.filePickerSel >= 0 && m.filePickerSel < len(m.filePickerFiles) {
-			name := m.filePickerFiles[m.filePickerSel]
-			fullPath := filepath.Join(m.filePickerDir, strings.TrimSuffix(name, "/"))
-			info, err := os.Stat(fullPath)
-			if err == nil && info.IsDir() {
-				m.filePickerDir = fullPath
-				m.filePickerSel = 0
-				m.loadDirectory()
-				return m, nil
-			}
-			m.openFile(fullPath)
-		}
-		return m, nil
-
-	case "up":
-		m.filePickerSel--
-		if m.filePickerSel < 0 {
-			m.filePickerSel = len(m.filePickerFiles) - 1
-		}
-
-	case "down":
-		m.filePickerSel++
-		if m.filePickerSel >= len(m.filePickerFiles) {
-			m.filePickerSel = 0
-		}
-
-	case "backspace":
-		if len(m.filePickerQuery) > 0 {
-			m.filePickerQuery = m.filePickerQuery[:len(m.filePickerQuery)-1]
-			m.loadDirectory()
-			m.filePickerSel = 0
-		}
-
-	default:
-		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
-			m.filePickerQuery += string(msg.Runes)
-			m.loadDirectory()
-			m.filePickerSel = 0
-		}
-	}
-	return m, nil
-}
-
-func (m *Model) openFile(path string) {
-	b, err := fileio.Load(path)
-	if err != nil {
-		return
-	}
-	m.buf = b
-	m.filename = path
-	m.language = highlight.DetectLanguage(path)
-	m.modified = false
-	m.mode = ModeNormal
-	m.cursor.SetPos(0, 0)
-	m.syncGapToCursor()
-	m.addRecentFile(path)
-}
-
-func (m *Model) renderFilePicker() string {
-	var lines []string
-	lines = append(lines, fmt.Sprintf("Abrir: %s > %s", m.filePickerDir, m.filePickerQuery))
-	lines = append(lines, "")
-
-	start := m.filePickerSel - 10
-	if start < 0 {
-		start = 0
-	}
-	end := start + 20
-	if end > len(m.filePickerFiles) {
-		end = len(m.filePickerFiles)
-	}
-
-	for i := start; i < end; i++ {
-		line := "  " + m.filePickerFiles[i]
-		if i == m.filePickerSel {
-			line = m.paletteActive.Render(line)
-		}
-		lines = append(lines, line)
-	}
-
-	if len(m.filePickerFiles) == 0 {
-		lines = append(lines, "  (diretório vazio)")
-	}
-
-	content := strings.Join(lines, "\n")
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		m.paletteStyle.Render(content))
-}
-
-// --- Save As ---
-
-func (m *Model) enterSaveAs() {
-	m.mode = ModeSaveAs
-	m.saveAsQuery = m.filename
-}
-
-func (m *Model) handleSaveAsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.mode = ModeNormal
-		return m, nil
-
-	case "enter":
-		if m.saveAsQuery != "" {
-			m.filename = m.saveAsQuery
-			m.language = highlight.DetectLanguage(m.filename)
-			m.save()
-			m.addRecentFile(m.filename)
-			m.mode = ModeNormal
-		}
-		return m, nil
-
-	case "backspace":
-		if len(m.saveAsQuery) > 0 {
-			m.saveAsQuery = m.saveAsQuery[:len(m.saveAsQuery)-1]
-		}
-
-	default:
-		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
-			m.saveAsQuery += string(msg.Runes)
-		}
-	}
-	return m, nil
-}
-
-func (m *Model) renderSaveAs() string {
-	var lines []string
-	lines = append(lines, "Salvar como:")
-	lines = append(lines, "")
-	lines = append(lines, "> "+m.saveAsQuery)
-	lines = append(lines, "")
-	lines = append(lines, "Enter para confirmar, Esc para cancelar")
-
-	content := strings.Join(lines, "\n")
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-		m.paletteStyle.Render(content))
-}
-
-// --- Rename ---
-
-func (m *Model) enterRename() {
-	if m.filename == "" {
-		return
-	}
-	m.mode = ModeRename
-	m.renameInput = filepath.Base(m.filename)
-	m.renameError = ""
-}
-
-func (m *Model) handleRenameKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.mode = ModeNormal
-		m.renameError = ""
-		return m, nil
-
-	case "enter":
-		return m.confirmRename()
-
-	case "backspace":
-		if len(m.renameInput) > 0 {
-			m.renameInput = m.renameInput[:len(m.renameInput)-1]
-			m.renameError = ""
-		}
-
-	default:
-		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
-			m.renameInput += string(msg.Runes)
-			m.renameError = ""
-		}
-	}
-	return m, nil
-}
-
-func (m *Model) confirmRename() (tea.Model, tea.Cmd) {
-	newName := strings.TrimSpace(m.renameInput)
-	oldPath := m.filename
-
-	if newName == "" {
-		m.renameError = "Nome nao pode estar vazio."
-		return m, nil
-	}
-	if newName == filepath.Base(oldPath) {
-		m.mode = ModeNormal
-		m.renameError = ""
-		return m, nil
-	}
-	if err := validateFileName(newName); err != nil {
-		m.renameError = err.Error()
-		return m, nil
-	}
-
-	// Auto-save if modified
-	if m.modified {
-		m.save()
-		if m.modified {
-			m.renameError = "Erro ao salvar antes de renomear."
-			return m, nil
-		}
-	}
-
-	// Execute rename
-	dir := filepath.Dir(oldPath)
-	newPath := filepath.Join(dir, newName)
-
-	// Check if destination exists (cross-platform safety)
-	if _, err := os.Stat(newPath); err == nil {
-		m.renameError = fmt.Sprintf("Arquivo ja existe: %s", newName)
-		return m, nil
-	}
-
-	if err := fileio.Rename(oldPath, newPath); err != nil {
-		m.renameError = fmt.Sprintf("Erro ao renomear: %v", err)
-		return m, nil
-	}
-
-	// Success
-	m.filename = newPath
-	m.language = highlight.DetectLanguage(newPath)
-	m.mode = ModeNormal
-	m.renameError = ""
-	m.addRecentFile(newPath)
-	return m, nil
-}
-
-func (m *Model) renderRenameBar() string {
-	oldName := filepath.Base(m.filename)
-	s := fmt.Sprintf("Renomear: %s → %s", oldName, m.renameInput)
-	if m.renameError != "" {
-		s += "  " + lipgloss.NewStyle().
-			Foreground(lipgloss.Color("203")).
-			Render("(" + m.renameError + ")")
-	}
-	return m.searchStyle.Render(s)
-}
-
-// validateFileName checks for invalid characters in a file name.
-func validateFileName(name string) error {
-	invalid := []rune{'/', '\\', ':', '*', '?', '"', '<', '>', '|'}
-	for _, c := range invalid {
-		if strings.ContainsRune(name, c) {
-			return fmt.Errorf("caractere invalido: %c", c)
-		}
-	}
-	return nil
+func autoSaveTick() tea.Cmd {
+	return tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
+		return autoSaveMsg{}
+	})
 }
 
 // --- Recent Files ---
 
 func (m *Model) addRecentFile(path string) {
-	// Remove if already exists
 	for i, f := range m.recentFiles {
 		if f == path {
 			m.recentFiles = append(m.recentFiles[:i], m.recentFiles[i+1:]...)
 			break
 		}
 	}
-	// Add to front
 	m.recentFiles = append([]string{path}, m.recentFiles...)
-	// Limit to 10
 	if len(m.recentFiles) > 10 {
 		m.recentFiles = m.recentFiles[:10]
 	}
-	// Also save the current filename in OpenFile/SaveAs for recovery
 }
 
 func (m *Model) loadRecentFiles() {
@@ -1583,11 +509,10 @@ func (m *Model) loadRecentFiles() {
 	if err != nil {
 		return
 	}
-	// Simple format: one path per line
 	m.recentFiles = strings.Split(strings.TrimSpace(string(data)), "\n")
 }
 
-func (m *Model) saveRecentFiles() {
+func (m *Model) SaveRecentFiles() {
 	if len(m.recentFiles) == 0 {
 		return
 	}
@@ -1601,12 +526,128 @@ func (m *Model) saveRecentFiles() {
 	os.WriteFile(path, []byte(strings.Join(m.recentFiles, "\n")), 0600)
 }
 
-// --- Auto-save ---
+func (m *Model) saveRecentFiles() {
+	m.SaveRecentFiles()
+}
 
-type autoSaveMsg struct{}
+// validateFileName checks for invalid characters in a file name.
+func validateFileName(name string) error {
+	invalid := []rune{'/', '\\', ':', '*', '?', '"', '<', '>', '|'}
+	for _, c := range invalid {
+		if strings.ContainsRune(name, c) {
+			return fmt.Errorf("caractere invalido: %c", c)
+		}
+	}
+	return nil
+}
 
-func autoSaveTick() tea.Cmd {
-	return tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
-		return autoSaveMsg{}
+// --- Multi-cursor helpers ---
+
+// allCursors returns all active cursors (primary + extras) sorted by position.
+func (m *Model) allCursors() []EditorCursor {
+	primary := EditorCursor{
+		Line:   m.cursor.Line,
+		Col:    m.cursor.Col,
+		GapPos: m.buf.GapPosition(),
+	}
+	all := make([]EditorCursor, 0, len(m.extraCursors)+1)
+	all = append(all, primary)
+	all = append(all, m.extraCursors...)
+	return all
+}
+
+// wordAtCursor returns the word under the primary cursor.
+func (m *Model) wordAtCursor() string {
+	line := m.currentLineText()
+	if len(line) == 0 {
+		return ""
+	}
+
+	start := m.cursor.Col
+	for start > 0 && isWordChar(rune(line[start-1])) {
+		start--
+	}
+	end := m.cursor.Col
+	for end < len(line) && isWordChar(rune(line[end])) {
+		end++
+	}
+
+	if start == end {
+		return ""
+	}
+	return line[start:end]
+}
+
+func isWordChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
+}
+
+// addNextOccurrence finds the next occurrence of the word at cursor and adds it.
+func (m *Model) addNextOccurrence() {
+	word := m.wordAtCursor()
+	if word == "" {
+		return
+	}
+
+	// Build list of existing positions (primary + extras)
+	existing := make(map[int]bool)
+	existing[m.buf.GapPosition()] = true
+	for _, c := range m.extraCursors {
+		existing[c.GapPos] = true
+	}
+
+	// Start search from after the last cursor position
+	lastPos := m.buf.GapPosition()
+	for _, c := range m.extraCursors {
+		if c.GapPos > lastPos {
+			lastPos = c.GapPos
+		}
+	}
+
+	content := m.buf.String()
+	searchStart := lastPos + 1
+
+	idx := strings.Index(content[searchStart:], word)
+	if idx == -1 {
+		// Wrap around: search from beginning
+		idx = strings.Index(content, word)
+	}
+	if idx == -1 {
+		return
+	}
+
+	// Calculate actual position
+	actualPos := idx
+	if actualPos < len(content) && actualPos >= searchStart {
+		// already correct
+	} else if idx >= 0 && idx < searchStart-lastPos+searchStart {
+		actualPos = idx
+	} else {
+		actualPos = searchStart + idx
+	}
+
+	// Clamp
+	if actualPos >= len(content) {
+		actualPos = idx
+	}
+	if actualPos >= len(content) {
+		return
+	}
+
+	// Don't add duplicates
+	if existing[actualPos] {
+		return
+	}
+
+	line, col := m.buf.LineCol(actualPos)
+	m.extraCursors = append(m.extraCursors, EditorCursor{
+		Line:   line,
+		Col:    col,
+		GapPos: actualPos,
 	})
+}
+
+// clearExtraCursors removes all extra cursors.
+func (m *Model) clearExtraCursors() {
+	m.extraCursors = nil
 }
