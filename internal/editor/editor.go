@@ -115,6 +115,9 @@ type Model struct {
 	// Close request from container (tab/split manager)
 	closeRequested bool
 
+	// Config
+	config Config
+
 	// LSP integration
 	lspClient        *lsp.Client
 	diagnostics      map[int][]lsp.Diagnostic // line → diagnostics
@@ -177,6 +180,11 @@ func New() *Model {
 	}
 	m.registerActions()
 	m.loadRecentFiles()
+
+	cfg, _ := LoadConfig()
+	m.config = cfg
+	m.highlighter.SetTheme(cfg.Theme)
+
 	return m
 }
 
@@ -198,6 +206,11 @@ func NewWithFile(path string) (*Model, error) {
 	m.language = highlight.DetectLanguage(path)
 	m.mode = ModeNormal
 	m.loadRecentFiles()
+
+	cfg, _ := LoadConfig()
+	m.config = cfg
+	m.highlighter.SetTheme(cfg.Theme)
+
 	return m, nil
 }
 
@@ -218,6 +231,11 @@ func (m *Model) registerActions() {
 		{ID: "search.replace", Label: "Substituir", Shortcut: "Ctrl+H"},
 		{ID: "view.go-line", Label: "Ir para linha", Shortcut: "Ctrl+G"},
 		{ID: "file.rename", Label: "Renomear arquivo", Shortcut: "F2"},
+		{ID: "view.toggle-auto-close", Label: "Toggle Auto-Close Brackets", Shortcut: "F4"},
+		{ID: "view.toggle-vim-mode", Label: "Toggle Modo Vim", Shortcut: "F5"},
+		{ID: "view.next-theme", Label: "Proximo Tema", Shortcut: "F6"},
+		{ID: "view.toggle-word-wrap", Label: "Toggle Word Wrap", Shortcut: "Alt+Z"},
+		{ID: "file.toggle-format-on-save", Label: "Toggle Format on Save", Shortcut: ""},
 	}
 }
 
