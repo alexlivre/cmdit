@@ -205,11 +205,6 @@ func NewWithFile(path string) (*Model, error) {
 	m.filename = path
 	m.language = highlight.DetectLanguage(path)
 	m.mode = ModeNormal
-	m.loadRecentFiles()
-
-	cfg, _ := LoadConfig()
-	m.config = cfg
-	m.highlighter.SetTheme(cfg.Theme)
 
 	return m, nil
 }

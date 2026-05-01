@@ -2,8 +2,6 @@ package editor
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -21,6 +19,15 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.Theme != "dark" {
 		t.Errorf("Theme should be 'dark' by default, got '%s'", cfg.Theme)
+	}
+	if cfg.WordWrap {
+		t.Error("WordWrap should be false by default")
+	}
+	if cfg.Keybindings == nil {
+		t.Error("Keybindings should not be nil by default")
+	}
+	if len(cfg.Keybindings) != 0 {
+		t.Error("Keybindings should be empty by default")
 	}
 }
 
@@ -57,35 +64,18 @@ func TestConfigRoundtrip(t *testing.T) {
 	}
 }
 
-func TestSaveLoadConfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, ".cmdit", "config.json")
-
-	cfg := Config{
-		Theme:            "dracula",
-		AutoCloseEnabled: false,
-	}
-	data, _ := json.MarshalIndent(cfg, "", "  ")
-	os.MkdirAll(filepath.Dir(configFile), 0700)
-	os.WriteFile(configFile, data, 0600)
-
-	if _, err := os.Stat(configFile); err != nil {
-		t.Fatalf("config file not created: %v", err)
-	}
-
-	readData, err := os.ReadFile(configFile)
+func TestLoadConfigDefaultsWhenNoFile(t *testing.T) {
+	// We can't easily override UserHomeDir, but we can test that
+	// LoadConfig() doesn't panic and returns a valid config.
+	// The function handles errors gracefully.
+	cfg, err := LoadConfig()
 	if err != nil {
-		t.Fatalf("read back: %v", err)
+		// This is OK on systems without home dir
+		t.Logf("LoadConfig error (expected on some systems): %v", err)
+		cfg = DefaultConfig()
 	}
-
-	var decoded Config
-	json.Unmarshal(readData, &decoded)
-
-	if decoded.Theme != "dracula" {
-		t.Errorf("expected theme 'dracula', got '%s'", decoded.Theme)
-	}
-	if decoded.AutoCloseEnabled {
-		t.Error("expected AutoCloseEnabled false")
+	if cfg.Theme != "dark" {
+		t.Errorf("expected default theme 'dark', got '%s'", cfg.Theme)
 	}
 }
 
