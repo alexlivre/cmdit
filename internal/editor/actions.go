@@ -81,6 +81,13 @@ func (m *Model) save() {
 	if err := fileio.Save(m.filename, m.buf); err == nil {
 		m.modified = false
 	}
+
+	// Format on save
+	if m.config.FormatOnSave {
+		m.applyFormat()
+		// Re-save with formatted content
+		fileio.Save(m.filename, m.buf)
+	}
 }
 
 func (m *Model) openFile(path string) {
