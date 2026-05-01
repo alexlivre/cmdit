@@ -2,9 +2,9 @@
 
 > **Meta:** Construir um editor de texto TUI modeless, CUA-first, que seja a melhor alternativa ao Vim — usável por leigos em desktop e por devs em servidores SSH.
 >
-> **Arquitetura:** Go + Bubble Tea + Lip Gloss. Elm-like (Model/Update/View). Gap buffer v1, Rope v2. Command palette como camada de descoberta. Lua para plugins.
+> **Arquitetura:** Go + Bubble Tea + Lip Gloss. Elm-like (Model/Update/View). Gap buffer v1, Rope v2. Command palette como camada de descoberta. Funcionalidades built-in sem sistema de plugins.
 >
-> **Stack:** Go 1.22+, Bubble Tea, Bubbles, Lip Gloss (charm.sh), Chroma (syntax v1), gopher-lua (plugins v2), Treesitter (v2)
+> **Stack:** Go 1.22+, Bubble Tea, Bubbles, Lip Gloss (charm.sh), Chroma (syntax v1), Treesitter (v2)
 
 ---
 
@@ -19,8 +19,8 @@
 | Multiple cursors | ❌ | ❌ | ✅ | ✅ | ✅ |
 | LSP nativo | ❌ | ❌ | ✅ | ❌ | ✅ (v2) |
 | Treesitter | ❌ | ❌ | ✅ | ❌ | ✅ (v2) |
-| Plugin system | ✅ | ❌ | ❌ | ❌ | ✅ (Lua v2) |
-| Vim keymap | ✅ | ❌ | ❌ | ❌ | 🔌 plugin |
+| Plugin system | ✅ | ❌ | ❌ | ❌ | ❌ (built-in only) |
+| Vim keymap | ✅ | ❌ | ❌ | ❌ | ✅ built-in (toggle) |
 | Single binary | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Curva aprendizado | 🔴 meses | 🟢 segundos | 🟡 dias | 🟢 minutos | 🟢 **segundos** |
 
@@ -61,9 +61,6 @@ cmdit/
 │   └── fileio/
 │       ├── fileio.go                # Load/Save arquivos
 │       └── fileio_test.go
-├── plugins/
-│   └── lua/
-│       └── runtime.go               # Lua VM (v2)
 ├── go.mod
 ├── go.sum
 ├── Makefile
@@ -85,8 +82,9 @@ cmdit/
 | **6** | File operations | 1 sem | Ctrl+O, salvar como, recentes |
 | **7** | Polimento v1 | 1-2 sem | Auto-save, welcome, OSC52, status bar |
 | **8** | Power features | 3-4 sem | Múltiplos cursores, abas, splits, LSP | ✅ |
-| **9** | Plugins Lua | 2-3 sem | Lua runtime, API, marketplace | 📋 |
-| **10** | Produção | 2 sem | Cross-compile, CI/CD, installer, docs | 📋 |
+| **9** | Features built-in | 1-2 sem | Auto-close brackets, vim mode, format on save, themes, keybindings | 📋 |
+| **10** | Qualidade & estabilidade | 1-2 sem | Análise de código, edge cases, cobertura 70%+, robustez | 📋 |
+| **11** | Produção | 2 sem | Cross-compile, CI/CD, installer, docs | 📋 |
 
 ---
 
@@ -442,41 +440,400 @@ SplitContainer (tea.Model)
 
 ---
 
-## 📋 Fase 9 — Plugins Lua
+## 📋 Fase 9 — Features Built-in
 
-- [ ] **9.1** Integrar gopher-lua VM
-  - `plugins/lua/runtime.go` — inicializa VM, expõe API
-  - Bloquear operações perigosas (file system, network) via sandbox
+**Objetivo:** Adicionar funcionalidades essenciais de editores modernos como código Go nativo — sem sistema de plugins.
 
-- [ ] **9.2** Definir API de plugins
-  ```lua
-  cmdit.map("Ctrl+Shift+M", function() ... end)
-  cmdit.buffer.insert("texto")
-  cmdit.buffer.get_line(42)
-  cmdit.cursor.move(10, 5)
-  cmdit.editor.save()
-  cmdit.ui.show_message("Pronto!")
-  ```
-
-- [ ] **9.3** Event hooks
-  - `cmdit.on_open(function(path) ... end)`
-  - `cmdit.on_save(function(path) ... end)`
-  - `cmdit.on_key(function(key) ... end)`
-
-- [ ] **9.4** Sistema de plugins
-  - `cmdit plugin install <nome>` — clona de git, copia para `~/.cmdit/plugins/`
-  - `cmdit plugin list` — lista plugins instalados
-  - `cmdit plugin remove <nome>` — remove plugin
-
-- [ ] **9.5** Criar plugin exemplo: `vim-keybindings`
-  - Mapeia hjkl, `:w`, `:q`, etc.
-  - Prova que a API é poderosa o suficiente
+**Filosofia:** Toda funcionalidade relevante deve vir built-in e ser ativada/desativada por toggle. Nada de Lua, nada de marketplace, nada de sandbox. Simples, direto, confiável.
 
 ---
 
-## 📋 Fase 10 — Produção
+### 9.1 Auto-close Brackets & Quotes
 
-- [ ] **10.1** Cross-compile no Makefile
+**Problema:** Usuário digita `(` e precisa manualmente digitar `)`.
+
+**Solução:** Inserir o par de fechamento automaticamente com smart-skip (se digitar o fechamento manualmente, pula o caractere existente).
+
+- [ ] **9.1.1** Criar `internal/editor/autoclose.go`
+  - Função `shouldAutoClose(char rune) (rune, bool)` — retorna o fechamento para `( [ { " ' \``
+  - Função `handleAutoClose(m *Model, openChar rune) tea.Cmd`
+    - Insere `openChar + closeChar` no buffer
+    - Move cursor entre eles
+    - Marca posição como "auto-closed" para smart-skip
+
+- [ ] **9.1.2** Implementar smart-skip no `keys.go`
+  - Se próximo caractere == char digitado E posição atual é "auto-closed" → pula (não insere duplicado)
+  - Funciona para todos os pares: `() [] {} "" '' ``
+
+- [ ] **9.1.3** Adicionar toggle: `F4` ou comando `view.toggle-auto-close`
+  - Estado salvo em `config.json`
+  - Indicador na status bar: `[AutoClose]`
+
+- [ ] **9.1.4** Testes:
+  - `TestAutoCloseParens` — digitar `(` insere `()` com cursor no meio
+  - `TestAutoCloseSmartSkip` — digitar `)` após `()` pula ao invés de duplicar
+  - `TestAutoCloseToggle` — desabilitar e verificar que não fecha
+
+---
+
+### 9.2 Vim Keybindings (Modo Toggle)
+
+**Problema:** Usuários vindos do Vim não conseguem usar o cmdit sem plugins.
+
+**Solução:** Modo Vim built-in com toggle `F5`. Implementado como uma camada de tradução de teclas no `keys.go`.
+
+- [ ] **9.2.1** Criar `internal/editor/vimmode.go`
+  - `type VimMode string` — `Normal`, `Insert`, `Visual`, `Command`
+  - `type VimState struct { mode VimMode; count string; lastOp string }`
+  - Mapa de keybindings vim:
+    ```
+    Normal mode:
+      h j k l → move cursor
+      w b → next/prev word
+      0 $ → line start/end
+      gg G → file start/end
+      i I a A o O → enter insert mode
+      x → delete char
+      dd → delete line
+      yy → copy line
+      p P → paste after/before
+      u Ctrl+R → undo/redo
+      / → search
+      :w :q :wq → save/quit/save+quit
+      Esc → normal mode (from any)
+    ```
+
+- [ ] **9.2.2** Integrar no `keys.go`
+  - `if m.vimMode { return dispatchVimKey(m, msg) }`
+  - Tradução transparente — resto do editor não sabe que está em modo vim
+
+- [ ] **9.2.3** Comando `view.toggle-vim-mode` no palette + atalho `F5`
+  - Estado salvo em `config.json`
+  - Indicador na status bar: `[VIM]` quando ativo
+
+- [ ] **9.2.4** Testes:
+  - `TestVimModeNavigation` — hjkl movem cursor
+  - `TestVimModeInsert` — `i` entra em insert mode
+  - `TestVimModeSave` — `:w` salva arquivo
+  - `TestVimModeToggle` — `F5` ativa/desativa
+
+---
+
+### 9.3 Format on Save
+
+**Problema:** Desenvolvedores precisam formatar código manualmente.
+
+**Solução:** Executar formatador externo ao salvar, baseado na linguagem detectada.
+
+- [ ] **9.3.1** Criar `internal/editor/format.go`
+  - `type FormatterFunc func(text string, lang string) (string, error)`
+  - Registro de formatadores:
+    ```
+    Go      → gofmt (via exec)
+    Python  → black / autopep8 (via exec, se disponível)
+    Rust    → rustfmt (via exec, se disponível)
+    JSON    → json.Indent (built-in Go)
+    Markdown→ prettier (via exec, se disponível)
+    ```
+  - Fallback universal: `editorconfig` (trim trailing whitespace, ensure newline at EOF)
+
+- [ ] **9.3.2** Hook no save (`Ctrl+S` e auto-save)
+  - `if config.FormatOnSave { formatAndSave() }`
+  - Mostra mensagem na status bar: "Formatado com gofmt" ou "gofmt não encontrado"
+
+- [ ] **9.3.3** Comando `file.toggle-format-on-save` no palette
+  - Estado salvo em `config.json`
+  - Indicador na status bar: `[Fmt]`
+
+- [ ] **9.3.4** Testes:
+  - `TestFormatOnSaveGo` — salvar arquivo .go e verificar que gofmt foi aplicado
+  - `TestFormatOnSaveDisabled` — salvar sem formatar
+  - `TestFormatFallback` — sem formatador externo, aplica trim trailing whitespace
+
+---
+
+### 9.4 Sistema de Temas (Runtime Switch)
+
+**Problema:** Usuário quer trocar entre tema claro e escuro sem reiniciar.
+
+**Solução:** `F6` alterna entre os 5 temas built-in em tempo real.
+
+- [ ] **9.4.1** Criar `internal/highlight/themes.go`
+  - Carregar todos os temas Chroma disponíveis
+  - `func SwitchTheme(name string)` — troca tema e força re-render
+  - Lista de temas: `dark` (padrão), `light`, `monokai`, `dracula`, `solarized-dark`
+
+- [ ] **9.4.2** Atalho `F6` → próximo tema na rotação
+  - Status bar mostra nome do tema: `[dark]`
+
+- [ ] **9.4.3** Comando `view.next-theme` no palette
+  - Salva tema preferido em `config.json`
+
+- [ ] **9.4.4** Testes:
+  - `TestThemeSwitch` — trocar tema e verificar que tokens têm cores diferentes
+  - `TestThemePersist` — reiniciar com tema salvo
+
+---
+
+### 9.5 Custom Keybindings (JSON Config)
+
+**Problema:** Usuário quer remapear teclas sem editar código.
+
+**Solução:** Arquivo `~/.cmdit/config.json` com seção `keybindings`.
+
+- [ ] **9.5.1** Criar `internal/editor/config.go`
+  - `type Config struct { AutoClose bool; VimMode bool; FormatOnSave bool; Theme string; Keybindings map[string]string }`
+  - `LoadConfig() Config` — carrega de `~/.cmdit/config.json`
+  - `SaveConfig(c Config)` — salva alterações
+  - Criar diretório `~/.cmdit/` se não existir
+
+- [ ] **9.5.2** Exemplo de `config.json`:
+  ```json
+  {
+    "auto_close_enabled": true,
+    "vim_mode": false,
+    "format_on_save": true,
+    "theme": "dark",
+    "keybindings": {
+      "ctrl+s": "file.save",
+      "ctrl+shift+s": "file.save-as"
+    }
+  }
+  ```
+
+- [ ] **9.5.3** Integrar com `keybindings.go`
+  - Resolver ação por ID (`file.save`, `edit.undo`, etc.)
+  - Config do usuário sobrescreve defaults
+
+- [ ] **9.5.4** Testes:
+  - `TestConfigLoad` — carregar config.json
+  - `TestConfigKeybindOverride` — remapear Ctrl+S e verificar
+  - `TestConfigDefaults` — sem config.json, usar defaults
+
+---
+
+### 9.6 Word Wrap Toggle
+
+- [ ] **9.6.1** Implementar toggle word wrap
+  - Modos: `soft-wrap` (quebra visual), `no-wrap` (scroll horizontal)
+  - Atalho: `Alt+Z` (padrão VS Code)
+  - Indicador na status bar: `[Wrap]`
+
+---
+
+### Marcos
+- **M9: Completo sem plugins** — Auto-close, Vim mode, format on save, 5 temas, keybindings customizáveis
+
+---
+
+## 📋 Fase 10 — Qualidade & Estabilidade de Código
+
+**Objetivo:** Transformar o cmdit de "funcionando" para "confiável". Esta fase não adiciona funcionalidades visíveis — ela garante que tudo que existe funciona corretamente em todos os cenários.
+
+**Filosofia:** Bugs encontrados aqui nunca chegam ao usuário. Cada bug corrigido é um crash evitado. Cada edge case coberto é um usuário que não perde trabalho.
+
+---
+
+### 10.1 Análise Completa de Código
+
+- [ ] **10.1.1** Code review sistemático de todos os arquivos
+  - `internal/editor/` — editor.go (654), view.go (438), keys.go (699), actions.go (261), lsp_integration.go (95)
+  - `internal/tabs/` — tabmanager.go (367), split.go (400), flow_test.go
+  - `internal/lsp/` — lsp.go (340)
+  - `internal/buffer/` — buffer.go, cursor.go, undo.go
+  - `internal/command/` — palette.go, actions.go
+  - `internal/clipboard/` — clipboard.go
+  - `internal/fileio/` — fileio.go
+  - `internal/highlight/` — syntax.go
+  - `cmd/cmdit/main.go`
+
+- [ ] **10.1.2** Identificar e catalogar problemas:
+  - Funções muito longas (>50 linhas)
+  - Código duplicado (DRY violations)
+  - Responsabilidades misturadas (SRP violations)
+  - Nomes confusos ou inconsistentes
+  - Código morto (nunca executado ou inalcançável)
+
+- [ ] **10.1.3** Documentar débitos técnicos encontrados no CHANGELOG
+
+---
+
+### 10.2 Tratamento de Erros Robusto
+
+- [ ] **10.2.1** Auditar todo `error` retornado
+  - Nenhum `_` ignorando erro sem justificativa documentada
+  - Adicionar `if err != nil` com log ou tratamento adequado
+  - Erros críticos devem ser exibidos ao usuário na status bar
+
+- [ ] **10.2.2** Criar `internal/editor/errors.go`
+  - Centralizar mensagens de erro
+  - Função `showError(msg string)` → exibe na status bar em vermelho por 3 segundos
+  - Função `logError(err error, context string)` → log para `~/.cmdit/cmdit.log`
+
+- [ ] **10.2.3** Tratar panics
+  - Adicionar `defer recover()` nos loops principais
+  - Log do stack trace antes de crash
+  - Mensagem amigável: "cmdit encontrou um erro. Reporte em github.com/alexlivre/cmdit/issues"
+
+- [ ] **10.2.4** Testes de erro:
+  - `TestFileLoadNotFound` — abrir arquivo inexistente
+  - `TestFileSavePermission` — salvar em diretório sem permissão
+  - `TestLSPStartupFailure` — gopls não instalado
+  - `TestClipboardFailure` — clipboard indisponível
+  - `TestInvalidUTF8` — arquivo com bytes inválidos
+
+---
+
+### 10.3 Edge Cases e Robustez
+
+- [ ] **10.3.1** Arquivos extremos
+  - Arquivo vazio (0 bytes)
+  - Arquivo muito grande (100MB+) — testar performance de scroll
+  - Arquivo com 1 única linha de 100K caracteres
+  - Arquivo binário — detectar e avisar
+  - Arquivo com caracteres especiais: `\x00`, `\r\n`, BOM
+
+- [ ] **10.3.2** Buffer edge cases
+  - Inserir no início do buffer
+  - Inserir no final do buffer
+  - Deletar o último caractere do buffer
+  - Buffer com apenas `\n` (linha vazia)
+  - Undo até estado inicial (buffer vazio)
+  - Redo após undo (sem inserções no meio)
+
+- [ ] **10.3.3** Tabs edge cases
+  - Fechar a última aba (confirmação)
+  - Fechar todas as abas → deve mostrar welcome screen
+  - Ctrl+Tab com 1 aba (não faz nada)
+  - Ctrl+9 com menos de 9 abas (não faz nada)
+  - Abrir 50 abas (performance e UI da tab bar)
+  - Fechar aba com seleção via teclado (S=salvar, D=descartar, C=cancelar)
+
+- [ ] **10.3.4** Split edge cases
+  - Split com 0 abas em um painel
+  - Fechar todos os painéis → volta para single pane
+  - Redimensionar splits (se implementado)
+  - Focar painel vazio
+
+- [ ] **10.3.5** Multi-cursor edge cases
+  - Ctrl+D sem palavra sob cursor (não faz nada)
+  - Todos cursores na mesma posição (não duplica)
+  - Escape limpa cursores extras
+  - Editar com 100 cursores (performance)
+  - Desfazer operação multi-cursor
+
+- [ ] **10.3.6** LSP edge cases
+  - gopls não instalado → fallback silencioso
+  - gopls crash → reconectar automaticamente
+  - Arquivo não reconhecido → sem LSP
+  - Resposta LSP muito grande (timeout handling)
+  - Múltiplos arquivos .go abertos em abas diferentes
+
+---
+
+### 10.4 Cobertura de Testes
+
+- [ ] **10.4.1** Medir cobertura atual
+  ```bash
+  go test -coverprofile=coverage.out ./...
+  go tool cover -func=coverage.out
+  ```
+
+- [ ] **10.4.2** Meta por pacote:
+
+  | Pacote | Cobertura atual | Meta |
+  |--------|-----------------|------|
+  | `internal/buffer/` | ? | 85%+ |
+  | `internal/editor/` | ? | 70%+ |
+  | `internal/tabs/` | 59 testes | 70%+ |
+  | `internal/lsp/` | ? | 50%+ |
+  | `internal/command/` | ? | 70%+ |
+  | `internal/clipboard/` | ? | 60%+ |
+  | `internal/fileio/` | ? | 80%+ |
+  | `internal/highlight/` | ? | 60%+ |
+
+- [ ] **10.4.3** Escrever testes faltantes até atingir meta
+  - Prioridade: buffer → editor → tabs → fileio → command → lsp
+
+- [ ] **10.4.4** Adicionar `go test -race ./...` ao Makefile
+  - Detectar data races (especialmente em goroutines de auto-save e LSP)
+
+---
+
+### 10.5 Qualidade de Código
+
+- [ ] **10.5.1** Executar e corrigir `golangci-lint run ./...`
+  - errcheck, gosimple, govet, ineffassign, staticcheck, unused
+  - 0 warnings é a meta
+
+- [ ] **10.5.2** Padronizar nomes e convenções
+  - Funções exportadas com comentários (`// Foo does bar.`)
+  - Constantes em UPPER_CASE ou seguindo convenção Go
+  - Erros com prefixo do pacote: `buffer: cursor out of bounds`
+
+- [ ] **10.5.3** Refatorar funções longas (>50 linhas)
+  - Extrair para funções menores com nomes claros
+  - Cada função faz UMA coisa (Single Responsibility)
+
+- [ ] **10.5.4** Eliminar duplicação
+  - Buscar padrões repetidos com `grep` ou análise manual
+  - Extrair lógica comum para helpers
+
+- [ ] **10.5.5** Melhorar nomes
+  - Variáveis de 1 letra só em loops muito curtos
+  - Nomes descritivos: `lineCount` não `lc`, `tabManager` não `tm`
+  - Funções com verbo: `calculateOffset`, `renderLine`, `saveFile`
+
+---
+
+### 10.6 Performance
+
+- [ ] **10.6.1** Profiling
+  ```bash
+  go test -bench=. ./... -benchmem
+  ```
+  - Identificar alocações excessivas
+  - Medir tempo de renderização com arquivos grandes
+
+- [ ] **10.6.2** Otimizações-alvo
+  - Gap buffer: medir tempo de Insert/Delete
+  - Syntax highlight: debounce tokenização (não tokenizar a cada keystroke)
+  - LSP: verificar se há goroutines vazando
+  - View: medir tempo de renderização da tela completa
+
+- [ ] **10.6.3** Benchmarks
+  - `BenchmarkBufferInsert` — inserir 10000 chars
+  - `BenchmarkBufferDelete` — deletar 10000 chars
+  - `BenchmarkSyntaxHighlight` — tokenizar arquivo de 1000 linhas
+  - `BenchmarkRender` — renderizar tela 80x24 com syntax highlight
+
+---
+
+### 10.7 Segurança
+
+- [ ] **10.7.1** Path traversal
+  - Validar que `Ctrl+O` e `F3` não permitem `../../../etc/passwd`
+  - Resolver caminhos com `filepath.Clean()`
+
+- [ ] **10.7.2** Injeção de escape sequences
+  - Sanitizar conteúdo do arquivo antes de renderizar
+  - Bloquear sequências ANSI perigosas no buffer
+
+- [ ] **10.7.3** Permissões de arquivo
+  - `~/.cmdit/` deve ter permissão 0700
+  - `config.json` deve ter permissão 0600
+  - Não alterar permissões do arquivo editado ao salvar
+
+---
+
+### Marcos
+- **M10: Robusto** — Cobertura 70%+, 0 lint warnings, tratamento de erro completo, edge cases documentados
+
+---
+
+## 📋 Fase 11 — Produção
+
+- [ ] **11.1** Cross-compile no Makefile
   ```makefile
   build-all:
     GOOS=linux GOARCH=amd64 go build -o bin/cmdit-linux-amd64 ./cmd/cmdit
@@ -486,22 +843,22 @@ SplitContainer (tea.Model)
     GOOS=darwin GOARCH=arm64 go build -o bin/cmdit-darwin-arm64 ./cmd/cmdit
   ```
 
-- [ ] **10.2** GitHub Actions CI/CD
+- [ ] **11.2** GitHub Actions CI/CD
   - `go test ./...` + `go vet ./...` + `golangci-lint`
   - Build multi-plataforma
   - Release automático ao criar tag
 
-- [ ] **10.3** Script de instalação
+- [ ] **11.3** Script de instalação
   ```bash
   curl -sSL https://cmdit.dev/install.sh | bash
   # Detecta OS/arch, baixa binário, copia para /usr/local/bin
   ```
 
-- [ ] **10.4** Documentação
+- [ ] **11.4** Documentação
   - Site: cmdit.dev (Hugo ou Markdown no GitHub Pages)
   - Quickstart: "5 minutos para dominar o cmdit"
   - Guia de atalhos (cheatsheet)
-  - Guia de plugins
+  - Guia de configuração (config.json)
   - Guia de migração: "Vim → cmdit: o que muda"
 
 ---
@@ -535,7 +892,7 @@ SplitContainer (tea.Model)
 | Estrutura texto v2 | Rope | — | Melhor para arquivos grandes e múltiplos cursores |
 | Syntax v1 | Chroma (regex) | Treesitter | Simples, sem CGo, 500+ linguagens |
 | Syntax v2 | Treesitter | — | Precisão, folding, text objects |
-| Plugins | Lua (gopher-lua) | Yaegi, JavaScript | Familiar para usuários Neovim, sandbox fácil |
+| Plugins | ❌ (Decisão: funcionalidades built-in) | Lua (gopher-lua) | Público-alvo leigo não precisa de plugins; tudo built-in com toggle |
 | Clipboard SSH | OSC52 | — | Única solução que funciona via SSH |
 
 ---
@@ -551,7 +908,10 @@ SplitContainer (tea.Model)
 | **M5** | 4 | Ctrl+P palette com todos os comandos |
 | **M6** | 5 | Syntax highlight com 5 temas, detecção automática |
 | **M7: v1** | 6+7 | Binário único 3 plataformas, usável por leigos |
-| **M8: v2** | 8+9+10 | LSP, plugins Lua, múltiplos cursores, CI/CD |
+| **M8: v2** | 8 | LSP, múltiplos cursores, abas, splits |
+| **M9: completo** | 9 | Auto-close, Vim mode, format on save, 5 temas, keybindings |
+| **M10: robusto** | 10 | Cobertura 70%+, 0 lint warnings, edge cases tratados |
+| **M11: release** | 11 | Binários 6 plataformas, CI/CD, docs, installer |
 
 ---
 
@@ -584,10 +944,14 @@ SplitContainer (tea.Model)
 | `Ctrl+W` | Fechar aba | 8 |
 | `Ctrl+Tab` | Alternar aba | 8 |
 | `Ctrl+D` | Selecionar próx. ocorrência | 8 |
+| `F4` | Toggle auto-close brackets | 9 |
+| `F5` | Toggle modo Vim | 9 |
+| `F6` | Próximo tema | 9 |
+| `Alt+Z` | Toggle word wrap | 9 |
 | `F12` | Ir para definição (LSP) | 8 |
 | `Ctrl+Space` | Auto-complete (LSP) | 8 |
 
 ---
 
-> **Última atualização:** 2026-04-30
-> **Versão:** 1.1
+> **Última atualização:** 2026-05-01
+> **Versão:** 2.0 — Reestruturação: Fase 9 (built-in features), Fase 10 (qualidade), Fase 11 (produção)
