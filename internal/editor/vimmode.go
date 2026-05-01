@@ -149,7 +149,9 @@ func (m *Model) vimNormal(key string) tea.Cmd {
 		m.vimDeleteChar(count)
 	case "d":
 		if m.vimState.LastOp == "d" {
-			m.vimDeleteLine()
+			for i := 0; i < count; i++ {
+				m.vimDeleteLine()
+			}
 			m.vimState.LastOp = ""
 		} else {
 			m.vimState.LastOp = "d"
@@ -159,7 +161,9 @@ func (m *Model) vimNormal(key string) tea.Cmd {
 	// Yank
 	case "y":
 		if m.vimState.LastOp == "y" {
-			m.vimYankLine()
+			for i := 0; i < count; i++ {
+				m.vimYankLine()
+			}
 			m.vimState.LastOp = ""
 		} else {
 			m.vimState.LastOp = "y"
@@ -175,6 +179,8 @@ func (m *Model) vimNormal(key string) tea.Cmd {
 	// Undo
 	case "u":
 		m.undo()
+	case "ctrl+r":
+		m.redo()
 
 	// Search (reuse existing search mode)
 	case "/":
@@ -314,28 +320,50 @@ func (m *Model) vimPrevWord(n int) {
 }
 
 func (m *Model) vimDeleteChar(n int) {
+	var deleted string
+	pos := m.buf.GapPosition()
 	for i := 0; i < n; i++ {
 		r := m.buf.RuneAt(m.buf.GapPosition())
-		m.undoStack.Push(buffer.Operation{
-			Type: "insert",
-			Pos:  m.buf.GapPosition(),
-			Text: string(r),
-		})
+		if r == 0 {
+			break
+		}
+		deleted += string(r)
 		m.buf.DeleteForward()
 	}
-	m.modified = true
-	m.sendDidChange()
+	if len(deleted) > 0 {
+		m.undoStack.Push(buffer.Operation{
+			Type: "insert",
+			Pos:  pos,
+			Text: deleted,
+		})
+		m.modified = true
+		m.sendDidChange()
+	}
 	m.clampCursor()
 }
 
 func (m *Model) vimDeleteLine() {
+	lineStart := m.buf.LineStart(m.cursor.Line)
 	lineText := m.currentLineText()
+	lineLen := len(lineText)
 
-	// Push undo operation for the line content
+	// Check if there is a trailing newline after this line
+	hasNewline := false
+	if lineStart+lineLen < m.buf.Len() {
+		if m.buf.RuneAt(lineStart + lineLen) == '\n' {
+			hasNewline = true
+		}
+	}
+
+	// Push undo operation for the line content (+ newline only if present)
+	undoText := lineText
+	if hasNewline {
+		undoText += "\n"
+	}
 	m.undoStack.Push(buffer.Operation{
 		Type: "insert",
-		Pos:  m.buf.LineStart(m.cursor.Line),
-		Text: lineText + "\n",
+		Pos:  lineStart,
+		Text: undoText,
 	})
 
 	// Move gap to line start
@@ -343,16 +371,12 @@ func (m *Model) vimDeleteLine() {
 	m.syncGapToCursor()
 
 	// Delete characters on this line
-	lineLen := len(lineText)
 	for i := 0; i < lineLen; i++ {
 		m.buf.DeleteForward()
 	}
-	// Delete the newline (if present)
-	if m.buf.GapPosition() < m.buf.Len() {
-		r := m.buf.RuneAt(m.buf.GapPosition())
-		if r == '\n' {
-			m.buf.DeleteForward()
-		}
+	// Delete the newline if present
+	if hasNewline {
+		m.buf.DeleteForward()
 	}
 
 	m.modified = true

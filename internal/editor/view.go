@@ -220,7 +220,13 @@ func (m *Model) renderStatus() string {
 		}
 	}
 
-	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + "  Ctrl+S Salvar  Ctrl+Q Sair")
+	// Show vim mode indicator
+	vimIndicator := ""
+	if m.config.VimMode {
+		vimIndicator = " [VIM]"
+	}
+
+	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + vimIndicator + "  Ctrl+S Salvar  Ctrl+Q Sair")
 }
 
 // --- Confirm dialog ---

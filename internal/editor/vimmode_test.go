@@ -258,3 +258,43 @@ func TestVimModeCommandSave(t *testing.T) {
 		t.Error("expected buffer to be saved (modified = false)")
 	}
 }
+
+// TestVimModeUndoDeleteChar tests that undo after multi-char delete (e.g. 2x)
+// restores all deleted characters in a single undo operation.
+func TestVimModeUndoDeleteChar(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+
+	m.config.VimMode = true
+	m.vimState.Mode = VimNormal
+
+	// Type "abcdef" in insert mode
+	m.handleKey(keyRune('i'))
+	for _, r := range "abcdef" {
+		m.handleKey(keyRune(r))
+	}
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+
+	// Move to col 1 (position on 'b')
+	m.handleKey(keyRune('l'))
+	if m.cursor.Col != 1 {
+		t.Fatalf("expected cursor col 1, got %d", m.cursor.Col)
+	}
+
+	// Use 3x to delete 3 characters ('b', 'c', 'd')
+	m.handleKey(keyRune('3'))
+	m.handleKey(keyRune('x'))
+	if m.buf.String() != "aef" {
+		t.Fatalf("expected 'aef' after 3x, got %q", m.buf.String())
+	}
+
+	// Undo: should restore all 3 chars at once
+	m.handleKey(keyRune('u'))
+	if m.buf.String() != "abcdef" {
+		t.Errorf("expected 'abcdef' after undo, got %q", m.buf.String())
+	}
+
+	// Verify only one undo step was pushed (undo again should undo the initial typing)
+	// But we're in vim mode still, so typing 'u' again would affect the insert mode text
+	// Just verify the first undo restored everything.
+}
