@@ -118,6 +118,9 @@ type Model struct {
 	// Config
 	config Config
 
+	// Auto-close
+	autoClosed map[int]bool // positions with auto-closed pairs
+
 	// LSP integration
 	lspClient        *lsp.Client
 	diagnostics      map[int][]lsp.Diagnostic // line → diagnostics

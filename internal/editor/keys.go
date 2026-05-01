@@ -57,6 +57,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.enterSaveAs()
 		return m, nil
 
+	case "f4":
+		if m.mode == ModeNormal {
+			m.executeAction("view.toggle-auto-close")
+		}
+		return m, nil
+
 	case "ctrl+q":
 		if m.modified {
 			m.mode = ModeConfirm
@@ -209,6 +215,19 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
 			m.clearSelection()
+			ch := msg.Runes[0]
+
+			// Auto-close brackets/quotes (before normal insert)
+			if m.config.AutoCloseEnabled {
+				if m.handleSmartSkip(ch) {
+					return m, nil
+				}
+				if _, ok := shouldAutoClose(ch); ok {
+					return m.handleAutoClose(ch)
+				}
+			}
+
+			// Normal insert
 			text := string(msg.Runes)
 			m.insertTextAtAllCursors(text)
 			m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
