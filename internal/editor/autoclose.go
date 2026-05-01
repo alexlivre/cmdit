@@ -8,12 +8,12 @@ import (
 
 // autoClosePairs maps opening characters to their closing counterparts.
 var autoClosePairs = map[rune]rune{
-	'(': ')',
-	'[': ']',
-	'{': '}',
-	'"': '"',
+	'(':  ')',
+	'[':  ']',
+	'{':  '}',
+	'"':  '"',
 	'\'': '\'',
-	'`': '`',
+	'`':  '`',
 }
 
 // shouldAutoClose returns (closingRune, true) if the character should trigger auto-close.

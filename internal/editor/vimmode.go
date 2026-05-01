@@ -12,7 +12,7 @@ import (
 type VimMode int
 
 const (
-	VimNormal  VimMode = iota
+	VimNormal VimMode = iota
 	VimInsert
 	VimVisual
 	VimCommand
@@ -350,7 +350,7 @@ func (m *Model) vimDeleteLine() {
 	// Check if there is a trailing newline after this line
 	hasNewline := false
 	if lineStart+lineLen < m.buf.Len() {
-		if m.buf.RuneAt(lineStart + lineLen) == '\n' {
+		if m.buf.RuneAt(lineStart+lineLen) == '\n' {
 			hasNewline = true
 		}
 	}
