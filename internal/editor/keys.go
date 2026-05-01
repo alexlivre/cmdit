@@ -240,6 +240,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveCursorWordRight()
 		return m, nil
 
+	case "alt+z":
+		if m.mode == ModeNormal {
+			m.executeAction("view.toggle-word-wrap")
+		}
+		return m, nil
+
 	default:
 		if len(msg.Runes) > 0 && msg.Runes[0] >= 32 {
 			m.clearSelection()

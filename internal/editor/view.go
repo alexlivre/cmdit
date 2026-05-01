@@ -57,32 +57,76 @@ func (m *Model) renderContent() string {
 		contentHeight -= 1
 	}
 
+	textWidth := m.viewport.Width() - lineNumWidth - 1
+	if textWidth < 5 {
+		textWidth = 5
+	}
+
 	var visibleLines []string
-	for i := m.viewport.ScrollY(); i < len(lines) && i < m.viewport.ScrollY()+contentHeight; i++ {
-		lineNum := fmt.Sprintf("%*d ", lineNumWidth, i+1)
-		styledLineNum := m.lineNumStyle.Render(lineNum)
 
-		// Apply syntax highlighting
-		segments := m.highlighter.HighlightLine(lines[i], m.language)
-		lineText := highlight.RenderSegments(segments)
+	if m.config.WordWrap {
+		displayLineCount := 0
+		for i := m.viewport.ScrollY(); i < len(lines) && displayLineCount < contentHeight; i++ {
+			wrapped := wrapText(lines[i], textWidth)
+			for wi, wl := range wrapped {
+				if displayLineCount >= contentHeight {
+					break
+				}
+				var prefix string
+				if wi == 0 {
+					lineNum := fmt.Sprintf("%*d ", lineNumWidth, i+1)
+					prefix = m.lineNumStyle.Render(lineNum)
+				} else {
+					prefix = strings.Repeat(" ", lineNumWidth+1)
+				}
 
-		// Apply indent guides
-		lineText = m.applyIndentGuides(lineText, lines[i])
+				// Apply syntax highlighting
+				segments := m.highlighter.HighlightLine(wl, m.language)
+				lineText := highlight.RenderSegments(segments)
 
-		// Apply search highlighting on top
-		if len(m.searchMatches) > 0 {
-			lineText = m.applySearchHighlight(lineText, i)
+				// Apply indent guides
+				lineText = m.applyIndentGuides(lineText, wl)
+
+				// Apply search highlighting on top
+				if len(m.searchMatches) > 0 {
+					lineText = m.applySearchHighlight(lineText, i)
+				}
+
+				if len(lineText) > textWidth {
+					lineText = lineText[:textWidth]
+				}
+
+				visibleLines = append(visibleLines, prefix+lineText)
+				displayLineCount++
+			}
 		}
+	} else {
+		for i := m.viewport.ScrollY(); i < len(lines) && i < m.viewport.ScrollY()+contentHeight; i++ {
+			lineNum := fmt.Sprintf("%*d ", lineNumWidth, i+1)
+			styledLineNum := m.lineNumStyle.Render(lineNum)
 
-		// Horizontal scroll
-		if m.viewport.ScrollX() > 0 && m.viewport.ScrollX() < len(lineText) {
-			lineText = lineText[m.viewport.ScrollX():]
-		}
-		if len(lineText) > m.viewport.Width()-lineNumWidth-1 {
-			lineText = lineText[:m.viewport.Width()-lineNumWidth-1]
-		}
+			// Apply syntax highlighting
+			segments := m.highlighter.HighlightLine(lines[i], m.language)
+			lineText := highlight.RenderSegments(segments)
 
-		visibleLines = append(visibleLines, styledLineNum+lineText)
+			// Apply indent guides
+			lineText = m.applyIndentGuides(lineText, lines[i])
+
+			// Apply search highlighting on top
+			if len(m.searchMatches) > 0 {
+				lineText = m.applySearchHighlight(lineText, i)
+			}
+
+			// Horizontal scroll
+			if m.viewport.ScrollX() > 0 && m.viewport.ScrollX() < len(lineText) {
+				lineText = lineText[m.viewport.ScrollX():]
+			}
+			if len(lineText) > textWidth {
+				lineText = lineText[:textWidth]
+			}
+
+			visibleLines = append(visibleLines, styledLineNum+lineText)
+		}
 	}
 
 	content := strings.Join(visibleLines, "\n")
@@ -443,4 +487,28 @@ func (m *Model) navigateToMatch(index int) {
 	m.cursor.SetPos(line, col)
 	m.syncGapToCursor()
 	m.viewport.EnsureVisible(line, col)
+}
+
+// wrapText wraps text at word boundaries to fit within the given width.
+func wrapText(text string, width int) []string {
+	if width <= 0 {
+		return []string{text}
+	}
+	var lines []string
+	for len(text) > width {
+		breakAt := width
+		// Try to find a word boundary (space/tab) in the second half of the line
+		for i := width - 1; i >= width/2; i-- {
+			if i < len(text) && (text[i] == ' ' || text[i] == '\t') {
+				breakAt = i + 1
+				break
+			}
+		}
+		lines = append(lines, text[:breakAt])
+		text = text[breakAt:]
+	}
+	if len(text) > 0 {
+		lines = append(lines, text)
+	}
+	return lines
 }
