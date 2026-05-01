@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-05-01
+
+### Added — Fase 9: Features Built-in
+
+- **Config System** — `~/.cmdit/config.json` with fields: `auto_close_enabled`, `vim_mode`, `format_on_save`, `word_wrap`, `theme`, `keybindings`. Persists all user preferences between sessions.
+- **Auto-Close Brackets** — Automatically closes `() [] {} "" '' \`\`` pairs. Smart-skip: typing the closing character skips over the auto-inserted one. Toggle with `F4`.
+- **Vim Mode Toggle** — `F5` enables Vim-style modal editing: Normal (`hjkl`, `w`, `b`, `0`, `$`, `gg`, `G`, `x`, `dd`, `yy`, `p`, `P`, `u`, `/`, `v`), Insert (`i`/`I`/`a`/`A`/`o`/`O`), Visual (`y`/`d`), Command (`:w`/`:q`/`:wq`/`:q!`). Count prefix support (`3dd`, `2x`). Built-in, no plugins.
+- **Theme Switching** — `F6` cycles through 5 themes in real time: dark, light, monokai, dracula, solarized-dark. Current theme shown in status bar and persisted.
+- **Word Wrap** — `Alt+Z` toggles line wrapping at the viewport width. Soft-wrap with smart word-boundary breaks.
+- **Format on Save** — Automatically formats code on save using external formatters: `gofmt` (Go), `black` (Python), `rustfmt` (Rust). Silently falls back if formatter is not installed.
+- **Custom Keybindings** — Remap any key to any action via `config.json` keybindings map. Overrides default key dispatch. Configurable without editing source code.
+
+### Changed
+
+- **Plan v2.0** — Development plan restructured: Phase 9 (built-in features) replaces Lua plugins. New Phase 10 (quality & stability). Phase 11 (production) renumbered from old Phase 10.
+- **Total tests:** 73 (was 65)
+
+---
+
 ## [0.3.1] — 2026-04-30
 
 ### Fixed

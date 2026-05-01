@@ -1,8 +1,8 @@
 # cmdit — Editor de texto para humanos no terminal
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev)
-[![Tests](https://img.shields.io/badge/testes-65%20passando-brightgreen)]()
-[![Version](https://img.shields.io/badge/versão-v0.3.1-blue)](https://github.com/alexlivre/cmdit/releases/tag/v0.3.1)
+[![Tests](https://img.shields.io/badge/testes-73%20passando-brightgreen)]()
+[![Version](https://img.shields.io/badge/versão-v0.4.0--dev-blue)](https://github.com/alexlivre/cmdit/releases)
 [![Licença](https://img.shields.io/badge/licença-MIT-blue)](LICENSE)
 [![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
 
@@ -47,6 +47,13 @@ Um único binário, zero dependências.
 - ✅ **Splits** — Ctrl+\ divide a tela horizontalmente. Clique para focar painel, Ctrl+\ alterna foco.
 - ✅ **Indent guides** — Linhas verticais sutis nos níveis de indentação.
 - ✅ **LSP client** — Inicia automaticamente gopls para Go. Diagnósticos de erros e warnings na barra de status. Extensível a Python, Rust, TypeScript.
+- ✅ **Auto-close brackets** — Fecha automaticamente `() [] {} "" '' \`\``. Smart-skip: digitar o fechamento pula o caractere existente.
+- ✅ **Modo Vim integrado** — `F5` ativa modo Vim (Normal/Insert/Visual/Command) com `hjkl`, `dd`, `yy`, `p`, `u`, `:w`, `:q`, `:wq`. Built-in, sem plugins.
+- ✅ **Troca de temas** — `F6` alterna entre 5 temas em tempo real: dark, light, monokai, dracula, solarized-dark.
+- ✅ **Word wrap** — `Alt+Z` alterna quebra de linha no viewport.
+- ✅ **Format on save** — Formata código automaticamente ao salvar (gofmt, black, rustfmt).
+- ✅ **Configuração JSON** — `~/.cmdit/config.json` persiste preferências entre sessões.
+- ✅ **Keybindings customizáveis** — Remapeie qualquer tecla via `config.json`.
 - ✅ **Single binary** — Um arquivo. Copia e roda. Zero dependências.
 - ✅ **Cross-platform** — Windows, Linux, macOS. Desktop e servidor SSH.
 
