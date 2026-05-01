@@ -45,6 +45,30 @@ func (m *Model) executeAction(id string) {
 		m.searchMatches = nil
 	case "file.rename":
 		m.enterRename()
+	case "view.toggle-auto-close":
+		m.config.AutoCloseEnabled = !m.config.AutoCloseEnabled
+		SaveConfig(m.config)
+	case "view.toggle-vim-mode":
+		m.config.VimMode = !m.config.VimMode
+		SaveConfig(m.config)
+	case "view.next-theme":
+		// Cycle through themes
+		themes := []string{"dark", "light", "monokai", "dracula", "solarized-dark"}
+		current := m.config.Theme
+		for i, t := range themes {
+			if t == current {
+				m.config.Theme = themes[(i+1)%len(themes)]
+				break
+			}
+		}
+		m.highlighter.SetTheme(m.config.Theme)
+		SaveConfig(m.config)
+	case "view.toggle-word-wrap":
+		m.config.WordWrap = !m.config.WordWrap
+		SaveConfig(m.config)
+	case "file.toggle-format-on-save":
+		m.config.FormatOnSave = !m.config.FormatOnSave
+		SaveConfig(m.config)
 	}
 }
 

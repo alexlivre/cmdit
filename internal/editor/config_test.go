@@ -2,6 +2,7 @@ package editor
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 )
 
@@ -87,5 +88,75 @@ func TestConfigModelIntegration(t *testing.T) {
 	}
 	if !m.config.AutoCloseEnabled {
 		t.Error("expected AutoCloseEnabled true")
+	}
+}
+
+func TestSaveLoadConfigRoundtrip(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Override home directory so configPath() uses temp dir
+	t.Setenv("USERPROFILE", tmpDir) // Windows
+	t.Setenv("HOME", tmpDir)        // Unix
+
+	cfg := Config{
+		AutoCloseEnabled: false,
+		VimMode:          true,
+		FormatOnSave:     true,
+		WordWrap:         true,
+		Theme:            "dracula",
+		Keybindings: map[string]string{
+			"ctrl+j": "file.save",
+		},
+	}
+
+	// Save
+	if err := SaveConfig(cfg); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+
+	// Load back
+	loaded, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	// Verify all fields match
+	if loaded.AutoCloseEnabled != cfg.AutoCloseEnabled {
+		t.Errorf("AutoCloseEnabled: expected %v, got %v", cfg.AutoCloseEnabled, loaded.AutoCloseEnabled)
+	}
+	if loaded.VimMode != cfg.VimMode {
+		t.Errorf("VimMode: expected %v, got %v", cfg.VimMode, loaded.VimMode)
+	}
+	if loaded.FormatOnSave != cfg.FormatOnSave {
+		t.Errorf("FormatOnSave: expected %v, got %v", cfg.FormatOnSave, loaded.FormatOnSave)
+	}
+	if loaded.WordWrap != cfg.WordWrap {
+		t.Errorf("WordWrap: expected %v, got %v", cfg.WordWrap, loaded.WordWrap)
+	}
+	if loaded.Theme != cfg.Theme {
+		t.Errorf("Theme: expected '%s', got '%s'", cfg.Theme, loaded.Theme)
+	}
+	if loaded.Keybindings["ctrl+j"] != "file.save" {
+		t.Errorf("Keybindings: expected 'file.save', got '%s'", loaded.Keybindings["ctrl+j"])
+	}
+}
+
+func TestLoadConfigCorruptedJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("USERPROFILE", tmpDir)
+	t.Setenv("HOME", tmpDir)
+
+	// Write invalid JSON to the config file
+	configFile := tmpDir + "/.cmdit/config.json"
+	os.MkdirAll(tmpDir+"/.cmdit", 0700)
+	os.WriteFile(configFile, []byte("not valid json {{{"), 0600)
+
+	cfg, err := LoadConfig()
+	if err == nil {
+		t.Error("LoadConfig should return error for corrupted JSON")
+	}
+	// Should return defaults
+	if cfg.AutoCloseEnabled != true {
+		t.Error("corrupted config should fall back to AutoCloseEnabled=true")
 	}
 }
