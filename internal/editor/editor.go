@@ -118,6 +118,9 @@ type Model struct {
 	// Config
 	config Config
 
+	// Vim mode
+	vimState VimState
+
 	// Auto-close
 	autoClosed map[int]bool // positions with auto-closed pairs
 
@@ -187,6 +190,8 @@ func New() *Model {
 	cfg, _ := LoadConfig()
 	m.config = cfg
 	m.highlighter.SetTheme(cfg.Theme)
+
+	m.vimState = newVimState()
 
 	return m
 }

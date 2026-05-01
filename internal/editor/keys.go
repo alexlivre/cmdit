@@ -17,6 +17,23 @@ import (
 // --- Main key handler ---
 
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Vim mode: intercept ALL keys when vim mode is on
+	if m.config.VimMode {
+		// In insert mode, handle Esc specially; pass rest to normal flow
+		if m.vimState.Mode == VimInsert {
+			switch msg.String() {
+			case "esc":
+				m.vimState.Mode = VimNormal
+				return m, nil
+			}
+			// Fall through to normal key handling for insert mode typing.
+			// Vim dispatch is skipped to avoid double-handling.
+		} else {
+			// Normal / Visual / Command: dispatch to vim handler
+			return m, m.dispatchVimKey(msg)
+		}
+	}
+
 	if m.mode == ModeWelcome {
 		return m.handleWelcomeKey(msg)
 	}
@@ -52,7 +69,6 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f2":
 		m.enterRename()
 		return m, nil
-
 	case "f3":
 		m.enterSaveAs()
 		return m, nil
@@ -60,6 +76,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f4":
 		if m.mode == ModeNormal {
 			m.executeAction("view.toggle-auto-close")
+		}
+		return m, nil
+
+	case "f5":
+		if m.mode == ModeNormal {
+			m.executeAction("view.toggle-vim-mode")
 		}
 		return m, nil
 
