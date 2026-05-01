@@ -2,6 +2,8 @@ package editor
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/alexb/cmdit/internal/buffer"
 )
 
 // autoClosePairs maps opening characters to their closing counterparts.
@@ -20,26 +22,54 @@ func shouldAutoClose(r rune) (rune, bool) {
 	return closer, ok
 }
 
-// handleAutoClose inserts a pair of characters and positions the cursor between them.
+// handleAutoClose inserts a pair of characters at all cursors and positions the
+// primary cursor between them. It supports multi-cursor and undo.
 func (m *Model) handleAutoClose(openChar rune) (tea.Model, tea.Cmd) {
 	closer, ok := shouldAutoClose(openChar)
 	if !ok {
 		return m, nil
 	}
 
-	// Record position before insert for smart-skip
-	cursorPos := m.buf.GapPosition()
+	cursors := m.allCursors()
 
-	// Insert both characters
-	m.buf.Insert(openChar)
-	m.buf.Insert(closer)
+	// Process from end to start to preserve positions
+	for i := len(cursors) - 1; i >= 0; i-- {
+		c := cursors[i]
+		m.moveGapTo(c.GapPos)
+		cursorPos := m.buf.GapPosition()
 
-	// Move cursor back to sit between the pair
-	m.buf.MoveGapLeft()
+		// Insert both characters
+		m.buf.Insert(openChar)
+		m.buf.Insert(closer)
+
+		// Position primary cursor between the pair (i==0 is always primary)
+		if i == 0 {
+			m.buf.MoveGapLeft()
+		}
+
+		// Push undo for the closing char first (undo reverses order)
+		m.undoStack.Push(buffer.Operation{
+			Type: "delete",
+			Pos:  cursorPos + 1,
+			Text: string(closer),
+		})
+		m.undoStack.Push(buffer.Operation{
+			Type: "delete",
+			Pos:  cursorPos,
+			Text: string(openChar),
+		})
+
+		// Mark position as auto-closed
+		m.markAutoClosed(cursorPos)
+	}
+
+	// Update cursor columns — primary cursor is now one col right of original
 	m.cursor.Col++
 
-	// Mark position as auto-closed
-	m.markAutoClosed(cursorPos)
+	// Update extra cursors (each is one col right of original)
+	for i := range m.extraCursors {
+		m.extraCursors[i].Col++
+	}
 
 	m.modified = true
 	m.sendDidChange()
