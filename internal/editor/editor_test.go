@@ -496,3 +496,186 @@ func TestPaletteActionRename(t *testing.T) {
 		t.Errorf("expected renameInput 'test.txt', got %q", m.renameInput)
 	}
 }
+
+// --- Phase 10 coverage tests ---
+
+func TestHandleDelete(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf.Insert('a')
+	m.buf.Insert('b')
+	m.buf.Insert('c')
+	m.cursor.SetPos(0, 3)
+	m.syncGapToCursor()
+
+	// Delete last character
+	m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.buf.String() != "ab" {
+		t.Errorf("expected 'ab', got %q", m.buf.String())
+	}
+
+	// Delete at beginning (no op)
+	m.cursor.SetPos(0, 0)
+	m.syncGapToCursor()
+	m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.buf.String() != "ab" {
+		t.Errorf("expected 'ab' unchanged, got %q", m.buf.String())
+	}
+
+	// Delete key
+	m.handleKey(tea.KeyMsg{Type: tea.KeyDelete})
+	if m.buf.String() != "b" {
+		t.Errorf("expected 'b', got %q", m.buf.String())
+	}
+}
+
+func TestMoveCursorWordLeftRight(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	for _, r := range "hello world" {
+		m.buf.Insert(r)
+	}
+	m.cursor.SetPos(0, 11)
+	m.syncGapToCursor()
+
+	// Word left from end
+	m.moveCursorWordLeft()
+	if m.cursor.Col != 6 {
+		t.Errorf("expected col 6 (start of 'world'), got %d", m.cursor.Col)
+	}
+
+	// Word left again
+	m.moveCursorWordLeft()
+	if m.cursor.Col != 0 {
+		t.Errorf("expected col 0, got %d", m.cursor.Col)
+	}
+
+	// Word right
+	m.moveCursorWordRight()
+	if m.cursor.Col != 6 {
+		t.Errorf("expected col 6, got %d", m.cursor.Col)
+	}
+}
+
+func TestWordAtCursorAndMultiCursor(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	for _, r := range "test word test" {
+		m.buf.Insert(r)
+	}
+	m.cursor.SetPos(0, 0)
+	m.syncGapToCursor()
+
+	// wordAtCursor at start
+	word := m.wordAtCursor()
+	if word != "test" {
+		t.Errorf("expected 'test', got '%s'", word)
+	}
+
+	// addNextOccurrence
+	m.addNextOccurrence()
+	if len(m.extraCursors) != 1 {
+		t.Errorf("expected 1 extra cursor, got %d", len(m.extraCursors))
+	}
+
+	// clear extra cursors
+	m.clearExtraCursors()
+	if len(m.extraCursors) != 0 {
+		t.Errorf("expected 0 extra cursors, got %d", len(m.extraCursors))
+	}
+}
+
+func TestCutAndDeleteSelection(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+
+	// deleteSelection with gap positioned at start of selection
+	for _, r := range "delete this" {
+		m.buf.Insert(r)
+	}
+	m.selStart = 0
+	m.selEnd = 6
+	m.cursor.SetPos(0, 6)
+	m.moveGapTo(0)
+	m.deleteSelection()
+	if m.buf.String() != " this" {
+		t.Errorf("expected ' this' after deleteSelection, got %q", m.buf.String())
+	}
+
+	// cut (without selection falls back to cut line)
+	m = New()
+	for _, r := range "cut me" {
+		m.buf.Insert(r)
+	}
+	m.cursor.SetPos(0, 0)
+	m.cut()
+	if m.buf.String() != "" {
+		t.Errorf("expected empty after cut line, got %q", m.buf.String())
+	}
+}
+
+func TestDoReplace(t *testing.T) {
+	m := New()
+	m.mode = ModeSearch
+	for _, r := range "foo bar foo" {
+		m.buf.Insert(r)
+	}
+
+	m.searchQuery = "foo"
+	m.replaceQuery = "baz"
+	m.doSearch()
+
+	// Verify search found matches
+	if len(m.searchMatches) != 2 {
+		t.Fatalf("expected 2 matches, got %d", len(m.searchMatches))
+	}
+
+	// Replace first
+	m.searchCurrent = 0
+	m.doReplace()
+	if m.buf.String() != "baz bar foo" {
+		t.Errorf("expected 'baz bar foo', got %q", m.buf.String())
+	}
+}
+
+func TestHandleMouse(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf.Insert('a')
+	m.buf.Insert('\n')
+	m.buf.Insert('b')
+	m.cursor.SetPos(0, 0)
+
+	// Mouse click on col 0 of line 1 (1-indexed since line 0 = status bar offset)
+	m.handleMouse(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft, X: 0, Y: 0})
+	// Y=0 maps to line 0 of content
+	if m.cursor.Line != 0 || m.cursor.Col != 0 {
+		t.Errorf("expected (0,0), got (%d,%d)", m.cursor.Line, m.cursor.Col)
+	}
+}
+
+func TestSave(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "save_test.txt")
+
+	m := New()
+	m.filename = path
+	m.mode = ModeNormal
+	for _, r := range "save content" {
+		m.buf.Insert(r)
+	}
+	m.modified = true
+
+	m.save()
+	if m.modified {
+		t.Error("expected modified=false after save")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("file not saved: %v", err)
+	}
+	if string(data) != "save content" {
+		t.Errorf("expected 'save content', got %q", string(data))
+	}
+}

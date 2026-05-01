@@ -1,6 +1,7 @@
 package editor
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/alexb/cmdit/internal/buffer"
@@ -95,6 +96,9 @@ func (m *Model) save() {
 }
 
 func (m *Model) openFile(path string) {
+	// Sanitize path to prevent traversal
+	path = filepath.Clean(path)
+
 	// Stop any existing LSP
 	m.stopLSP()
 

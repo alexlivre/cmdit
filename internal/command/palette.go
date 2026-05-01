@@ -110,7 +110,7 @@ func (p *PaletteModel) View() string {
 	items = append(items, p.inputStyle.Render("> "+p.query))
 
 	if len(p.query) == 0 {
-		items = append(items, p.shortcutStyle.Render("  Digite para buscar comandos..."))
+		items = append(items, p.shortcutStyle.Render("  Type to search commands..."))
 	}
 
 	for i := start; i < end; i++ {
@@ -128,7 +128,7 @@ func (p *PaletteModel) View() string {
 	}
 
 	if len(p.results) == 0 && len(p.query) > 0 {
-		items = append(items, p.shortcutStyle.Render("  Nenhum comando encontrado"))
+		items = append(items, p.shortcutStyle.Render("  No commands found"))
 	}
 
 	content := strings.Join(items, "\n")

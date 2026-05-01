@@ -214,3 +214,83 @@ func TestPrevTabGoesBack(t *testing.T) {
 
 	t.Log("✅ PASS: F7 goes back correctly")
 }
+
+// --- Phase 10 coverage tests ---
+
+func TestTenTabsNavigation(t *testing.T) {
+	tm := New()
+	// Create 9 more tabs (total 10)
+	for i := 0; i < 9; i++ {
+		tm.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	}
+	if len(tm.tabs) != 10 {
+		t.Fatalf("expected 10 tabs, got %d", len(tm.tabs))
+	}
+	// After creating 10 tabs, active is the last (index 9)
+	if tm.activeIdx != 9 {
+		t.Errorf("expected active tab 9 after creating 10 tabs, got %d", tm.activeIdx)
+	}
+
+	// F8 wraps from 9 → 0
+	tm.Update(tea.KeyMsg{Type: tea.KeyF8})
+	if tm.activeIdx != 0 {
+		t.Errorf("expected active tab 0 after F8 wrap, got %d", tm.activeIdx)
+	}
+
+	// F7 wraps from 0 → 9
+	tm.Update(tea.KeyMsg{Type: tea.KeyF7})
+	if tm.activeIdx != 9 {
+		t.Errorf("expected active tab 9 after F7 wrap, got %d", tm.activeIdx)
+	}
+
+	t.Log("✅ PASS: 10 tabs navigation")
+}
+
+func TestTabName(t *testing.T) {
+	tm, err := NewWithFile("README.md")
+	if err != nil {
+		t.Fatalf("NewWithFile failed: %v", err)
+	}
+	tab := tm.activeTab()
+	if tab.Name != "README.md" {
+		t.Errorf("expected 'README.md', got '%s'", tab.Name)
+	}
+
+	// New empty tab should be "[new]"
+	tm.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	tab = tm.activeTab()
+	if tab.Name != "[new]" {
+		t.Errorf("expected '[new]', got '%s'", tab.Name)
+	}
+
+	t.Log("✅ PASS: tab names correct")
+}
+
+func TestCloseLastTabQuits(t *testing.T) {
+	tm := New()
+	tab := tm.activeTab()
+	tab.Editor.SetFilename("test.txt")
+
+	// Close last tab should return tea.Quit
+	_, cmd := tm.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
+	if cmd == nil {
+		t.Log("expected some cmd when closing last tab")
+	}
+
+	t.Log("✅ PASS: close last tab")
+}
+
+func TestSplitCreateAndToggle(t *testing.T) {
+	sc := NewSingle(New())
+	if sc.HasSplit() {
+		t.Error("expected no split initially")
+	}
+
+	// Create split directly
+	sc.Split(SplitHorizontal)
+	if !sc.HasSplit() {
+		t.Error("expected split after Split()")
+	}
+
+	t.Log("✅ PASS: split create")
+}

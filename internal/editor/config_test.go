@@ -70,12 +70,12 @@ func TestConfigRoundtrip(t *testing.T) {
 }
 
 func TestLoadConfigDefaultsWhenNoFile(t *testing.T) {
-	// We can't easily override UserHomeDir, but we can test that
-	// LoadConfig() doesn't panic and returns a valid config.
-	// The function handles errors gracefully.
+	dir := t.TempDir()
+	t.Setenv("USERPROFILE", dir)
+	t.Setenv("HOME", dir)
+
 	cfg, err := LoadConfig()
 	if err != nil {
-		// This is OK on systems without home dir
 		t.Logf("LoadConfig error (expected on some systems): %v", err)
 		cfg = DefaultConfig()
 	}
@@ -85,6 +85,10 @@ func TestLoadConfigDefaultsWhenNoFile(t *testing.T) {
 }
 
 func TestConfigModelIntegration(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("USERPROFILE", dir)
+	t.Setenv("HOME", dir)
+
 	m := New()
 
 	if m.config.Theme != "dark" {

@@ -1,76 +1,76 @@
-# cmdit — Editor de texto para humanos no terminal
+# cmdit — Text editor for humans in the terminal
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev)
-[![Tests](https://img.shields.io/badge/testes-73%20passando-brightgreen)]()
-[![Version](https://img.shields.io/badge/versão-v0.4.0--dev-blue)](https://github.com/alexlivre/cmdit/releases)
-[![Licença](https://img.shields.io/badge/licença-MIT-blue)](LICENSE)
-[![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
+[![Tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-v0.4.1-blue)](https://github.com/alexlivre/cmdit/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
 
-**cmdit** é um editor de texto para terminal feito para pessoas — não para máquinas.  
-Abre, digita, sai. Funciona como o Bloco de Notas. **Zero curva de aprendizado.**
+**cmdit** is a terminal text editor made for people — not machines.
+Open, type, exit. Works like Notepad. **Zero learning curve.**
 
-Projetado para rodar tanto no seu desktop quanto via SSH em servidores.  
-Um único binário, zero dependências.
-
----
-
-## Por que existe?
-
-| Editor | Problema |
-|--------|----------|
-| **Vim** | Modos, `:wq`, `hjkl`, curva de meses |
-| **Nano** | Muito limitado, sem mouse, sem undo |
-| **Emacs** | `Ctrl+X Ctrl+C` para sair |
-| **Helix** | Paradigma `selection→action` confuso |
-| **Micro** | Abandonado, sem LSP nativo |
-
-**cmdit** resolve: poderoso como Vim, simples como Nano, moderno como Helix.
+Designed to run both on your desktop and via SSH on servers.
+A single binary, zero dependencies.
 
 ---
 
-## ✨ Funcionalidades
+## Why does it exist?
 
-- ✅ **Modeless** — digite como em qualquer editor. Sem modos Normal/Insert.
-- ✅ **Mouse** — clique para posicionar cursor, arraste para selecionar, scroll para rolar.
-- ✅ **Atalhos familiares** — Ctrl+S, Ctrl+Z, Ctrl+C, Ctrl+V. Padrão CUA.
-- ✅ **Undo/Redo ilimitado** — Ctrl+Z / Ctrl+Y.
-- ✅ **Command Palette** — Ctrl+P acessa todos os comandos com busca fuzzy.
-- ✅ **Syntax Highlighting** — Detecção automática de linguagem. Temas dark/light/monokai/dracula/solarized.
-- ✅ **Busca e substituição** — Ctrl+F / Ctrl+H com destaque de todas as ocorrências.
-- ✅ **File picker integrado** — Ctrl+O para abrir arquivos navegando por diretórios.
-- ✅ **Renomear arquivo** — F2 renomeia o arquivo atual com input inline.
-- ✅ **Auto-save** — Salva automaticamente a cada 30 segundos. `F9` ativa/desativa. Indicador `[AutoSave]` na barra de status.
-- ✅ **Tela de boas-vindas** — Mostra arquivos recentes ao abrir sem arquivo.
-- ✅ **Diálogo de confirmação** — Avisa ao sair se houver alterações não salvas.
-- ✅ **Abas** — Ctrl+T nova aba, Ctrl+W fecha, F8 próxima, F7 anterior, Ctrl+1-9 salta. Indicador ● para arquivos modificados.
-- ✅ **Múltiplos cursores** — Ctrl+D adiciona cursor na próxima ocorrência da palavra, Escape limpa. Edição simultânea em todos os cursores.
-- ✅ **Splits** — Ctrl+\ divide a tela horizontalmente. Clique para focar painel, Ctrl+\ alterna foco.
-- ✅ **Indent guides** — Linhas verticais sutis nos níveis de indentação.
-- ✅ **LSP client** — Inicia automaticamente gopls para Go. Diagnósticos de erros e warnings na barra de status. Extensível a Python, Rust, TypeScript.
-- ✅ **Auto-close brackets** — Fecha automaticamente `() [] {} "" '' \`\``. Smart-skip: digitar o fechamento pula o caractere existente.
-- ✅ **Modo Vim integrado** — `F5` ativa modo Vim (Normal/Insert/Visual/Command) com `hjkl`, `dd`, `yy`, `p`, `u`, `:w`, `:q`, `:wq`. Built-in, sem plugins.
-- ✅ **Troca de temas** — `F6` alterna entre 5 temas em tempo real: dark, light, monokai, dracula, solarized-dark.
-- ✅ **Word wrap** — `Alt+Z` alterna quebra de linha no viewport.
-- ✅ **Format on save** — Formata código automaticamente ao salvar (gofmt, black, rustfmt).
-- ✅ **Configuração JSON** — `~/.cmdit/config.json` persiste preferências entre sessões.
-- ✅ **Keybindings customizáveis** — Remapeie qualquer tecla via `config.json`.
-- ✅ **Single binary** — Um arquivo. Copia e roda. Zero dependências.
-- ✅ **Cross-platform** — Windows, Linux, macOS. Desktop e servidor SSH.
+| Editor | Problem |
+|--------|---------|
+| **Vim** | Modes, `:wq`, `hjkl`, months-long learning curve |
+| **Nano** | Too limited, no mouse, no undo |
+| **Emacs** | `Ctrl+X Ctrl+C` to exit |
+| **Helix** | Confusing `selection→action` paradigm |
+| **Micro** | Abandoned, no native LSP |
 
-### 📋 Planejado (v3)
-
-- 🔲 Treesitter para syntax highlighting preciso
-- 🔲 Plugins em Lua
-- 🔲 Vim keymap opcional via plugin
+**cmdit** solves: powerful like Vim, simple like Nano, modern like Helix.
 
 ---
 
-## ⚡ Instalação
+## ✨ Features
 
-### Pré-compilado (recomendado)
+- ✅ **Modeless** — type like in any editor. No Normal/Insert modes.
+- ✅ **Mouse** — click to position cursor, drag to select, scroll to navigate.
+- ✅ **Familiar shortcuts** — Ctrl+S, Ctrl+Z, Ctrl+C, Ctrl+V. CUA standard.
+- ✅ **Unlimited Undo/Redo** — Ctrl+Z / Ctrl+Y.
+- ✅ **Command Palette** — Ctrl+P accesses all commands with fuzzy search.
+- ✅ **Syntax Highlighting** — Automatic language detection. dark/light/monokai/dracula/solarized themes.
+- ✅ **Find and replace** — Ctrl+F / Ctrl+H with highlight of all occurrences.
+- ✅ **Integrated file picker** — Ctrl+O to open files browsing directories.
+- ✅ **Rename file** — F2 renames the current file with inline input.
+- ✅ **Auto-save** — Automatically saves every 30 seconds. `F9` toggles on/off. `[AutoSave]` indicator on the status bar.
+- ✅ **Welcome screen** — Shows recent files when opening without a file.
+- ✅ **Confirmation dialog** — Warns when quitting with unsaved changes.
+- ✅ **Tabs** — Ctrl+T new tab, Ctrl+W close, F8 next, F7 previous, Ctrl+1-9 jump. ● indicator for modified files.
+- ✅ **Multiple cursors** — Ctrl+D adds cursor at the next occurrence of the word, Escape clears. Simultaneous editing across all cursors.
+- ✅ **Splits** — Ctrl+\ splits the screen horizontally. Click to focus pane, Ctrl+\ toggles focus.
+- ✅ **Indent guides** — Subtle vertical lines at indent levels.
+- ✅ **LSP client** — Auto-starts gopls for Go. Error and warning diagnostics on the status bar. Extensible to Python, Rust, TypeScript.
+- ✅ **Auto-close brackets** — Automatically closes `() [] {} "" '' \`\``. Smart-skip: typing the closing bracket skips the existing character.
+- ✅ **Built-in Vim mode** — `F5` activates Vim mode (Normal/Insert/Visual/Command) with `hjkl`, `dd`, `yy`, `p`, `u`, `:w`, `:q`, `:wq`. Built-in, no plugins.
+- ✅ **Theme switching** — `F6` cycles through 5 themes in real time: dark, light, monokai, dracula, solarized-dark.
+- ✅ **Word wrap** — `Alt+Z` toggles line wrapping in the viewport.
+- ✅ **Format on save** — Automatically formats code on save (gofmt, black, rustfmt).
+- ✅ **JSON configuration** — `~/.cmdit/config.json` persists preferences across sessions.
+- ✅ **Customizable keybindings** — Remap any key via `config.json`.
+- ✅ **Single binary** — One file. Copy and run. Zero dependencies.
+- ✅ **Cross-platform** — Windows, Linux, macOS. Desktop and SSH server.
+
+### 📋 Planned (v3)
+
+- 🔲 Treesitter for precise syntax highlighting
+- 🔲 Lua plugins
+- 🔲 Optional Vim keymap via plugin
+
+---
+
+## ⚡ Installation
+
+### Pre-compiled (recommended)
 
 ```bash
-# Baixe o binário para sua plataforma em:
+# Download the binary for your platform at:
 # https://github.com/alexlivre/cmdit/releases
 
 # Linux/macOS
@@ -78,7 +78,7 @@ chmod +x cmdit
 sudo mv cmdit /usr/local/bin/
 
 # Windows
-# Mova cmdit.exe para uma pasta no PATH
+# Move cmdit.exe to a folder in PATH
 ```
 
 ### Go Install
@@ -97,90 +97,90 @@ go build -o cmdit ./cmd/cmdit
 
 ---
 
-## 🚀 Uso
+## 🚀 Usage
 
 ```bash
-# Abrir um arquivo
+# Open a file
 cmdit README.md
 
-# Criar novo arquivo
-cmdit novo-arquivo.txt
+# Create new file
+cmdit new-file.txt
 
-# Abrir sem arquivo (tela de boas-vindas)
+# Open without file (welcome screen)
 cmdit
 ```
 
 ---
 
-## ⌨️ Guia de atalhos
+## ⌨️ Shortcut guide
 
-### Arquivo
+### File
 
-| Atalho | Ação |
-|--------|------|
-| `Ctrl+S` | Salvar |
-| `Ctrl+O` | Abrir arquivo |
-| `F3` | Salvar como |
-| `F2` | Renomear arquivo |
-| `F9` | Ativar/desativar auto-save |
-| `Ctrl+Q` | Sair |
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl+S` | Save |
+| `Ctrl+O` | Open file |
+| `F3` | Save as |
+| `F2` | Rename file |
+| `F9` | Toggle auto-save |
+| `Ctrl+Q` | Quit |
 
-### Abas e Splits
+### Tabs and Splits
 
-| Atalho | Ação |
-|--------|------|
-| `Ctrl+T` | Nova aba |
-| `Ctrl+W` | Fechar aba |
-| `F8` | Próxima aba |
-| `F7` | Aba anterior |
-| `Ctrl+1-9` | Ir para aba N |
-| `Ctrl+\` | Criar/alternar split |
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl+T` | New tab |
+| `Ctrl+W` | Close tab |
+| `F8` | Next tab |
+| `F7` | Previous tab |
+| `Ctrl+1-9` | Go to tab N |
+| `Ctrl+\` | Create/toggle split |
 
-### Edição
+### Editing
 
-| Atalho | Ação |
-|--------|------|
-| `Ctrl+Z` | Desfazer |
-| `Ctrl+Y` | Refazer |
-| `Ctrl+C` | Copiar (seleção ou linha atual) |
-| `Ctrl+X` | Recortar |
-| `Ctrl+V` | Colar |
-| `Ctrl+A` | Selecionar tudo |
-| `Backspace` | Apagar caractere à esquerda |
-| `Delete` | Apagar caractere à direita |
-| `Tab` | Inserir 4 espaços |
-| `Ctrl+D` | Adicionar cursor (próx. ocorrência) |
-| `Escape` | Limpar cursores extras |
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+C` | Copy (selection or current line) |
+| `Ctrl+X` | Cut |
+| `Ctrl+V` | Paste |
+| `Ctrl+A` | Select all |
+| `Backspace` | Delete character to the left |
+| `Delete` | Delete character to the right |
+| `Tab` | Insert 4 spaces |
+| `Ctrl+D` | Add cursor (next occurrence) |
+| `Escape` | Clear extra cursors |
 
-### Navegação
+### Navigation
 
-| Atalho | Ação |
-|--------|------|
-| `↑ ↓ ← →` | Mover cursor |
-| `Ctrl+← / Ctrl+→` | Pular palavras |
-| `Home / End` | Início / fim da linha |
-| `Ctrl+Home / Ctrl+End` | Início / fim do arquivo |
-| `PageUp / PageDown` | Rolar página |
-| `Clique do mouse` | Posicionar cursor |
-| `Scroll do mouse` | Rolar |
+| Shortcut | Action |
+|---------|--------|
+| `↑ ↓ ← →` | Move cursor |
+| `Ctrl+← / Ctrl+→` | Jump words |
+| `Home / End` | Line start / end |
+| `Ctrl+Home / Ctrl+End` | File start / end |
+| `PageUp / PageDown` | Scroll page |
+| `Mouse click` | Position cursor |
+| `Mouse scroll` | Scroll |
 
-### Busca
+### Search
 
-| Atalho | Ação |
-|--------|------|
-| `Ctrl+F` | Buscar |
-| `Ctrl+H` | Buscar e substituir |
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl+F` | Find |
+| `Ctrl+H` | Find and replace |
 
-### Comandos
+### Commands
 
-| Atalho | Ação |
-|--------|------|
-| `Ctrl+P` | Paleta de comandos |
-| `Esc` | Fechar paleta / cancelar |
+| Shortcut | Action |
+|---------|--------|
+| `Ctrl+P` | Command palette |
+| `Esc` | Close palette / cancel |
 
 ---
 
-## 🆚 Comparativo com concorrentes
+## 🆚 Competitor comparison
 
 |  | **cmdit** | Vim | Nano | Helix | Micro |
 |--|-----------|-----|------|-------|-------|
@@ -195,70 +195,70 @@ cmdit
 | Tabs | ✅ | ✅ | ❌ | ❌ | ✅ |
 | Splits | ✅ | ✅ | ❌ | ✅ | ✅ |
 | Multi-cursor | ✅ | ❌ | ❌ | ✅ | ✅ |
-| LSP nativo | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Native LSP | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Single Binary | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Curva de aprendizado | 🟢 segundos | 🔴 meses | 🟢 segundos | 🟡 dias | 🟢 minutos |
+| Learning curve | 🟢 seconds | 🔴 months | 🟢 seconds | 🟡 days | 🟢 minutes |
 
 ---
 
-## 🏗️ Arquitetura
+## 🏗️ Architecture
 
 ```
 cmdit/
 ├── cmd/cmdit/main.go            # Entry point (SplitContainer → TabManager → editor.Model)
 ├── internal/
 │   ├── buffer/                  # Gap buffer + cursor + undo stack
-│   ├── clipboard/               # Clipboard interno
+│   ├── clipboard/               # Internal clipboard
 │   ├── command/                 # Command palette + action registry
-│   ├── editor/                  # Modelo Bubble Tea principal
+│   ├── editor/                  # Main Bubble Tea model
 │   │   ├── editor.go            # Model, Init, Update, helpers
-│   │   ├── view.go              # View + renderização
-│   │   ├── keys.go              # Key dispatch + modos
-│   │   ├── actions.go           # Comandos (save, undo, clipboard, etc.)
-│   │   └── lsp_integration.go   # Integração LSP
-│   ├── fileio/                  # Load/Save/Rename arquivos
+│   │   ├── view.go              # View + rendering
+│   │   ├── keys.go              # Key dispatch + modes
+│   │   ├── actions.go           # Commands (save, undo, clipboard, etc.)
+│   │   └── lsp_integration.go   # LSP integration
+│   ├── fileio/                  # File load/save/rename
 │   ├── highlight/               # Syntax highlighting via Chroma
-│   ├── lsp/                     # Cliente LSP (JSON-RPC 2.0)
+│   ├── lsp/                     # LSP client (JSON-RPC 2.0)
 │   ├── renderer/                # Viewport (scroll, resize)
-│   └── tabs/                    # Abas e splits
-│       ├── tabmanager.go        # TabManager (container de editor.Model)
-│       └── split.go             # SplitContainer (layout de painéis)
-├── bin/                         # Binários compilados
-├── go.mod / go.sum              # Dependências Go
+│   └── tabs/                    # Tabs and splits
+│       ├── tabmanager.go        # TabManager (editor.Model container)
+│       └── split.go             # SplitContainer (pane layout)
+├── bin/                         # Compiled binaries
+├── go.mod / go.sum              # Go dependencies
 ├── Makefile                     # Build, test, cross-compile
-└── PLANO.md                     # Plano de desenvolvimento completo
+└── PLANO.md                     # Full development plan
 ```
 
-### Stack tecnológica
+### Technology stack
 
-| Camada | Tecnologia | Motivo |
-|--------|-----------|--------|
-| Linguagem | **Go 1.23+** | Binário único, cross-compile, performance previsível |
-| TUI | **Bubble Tea + Lip Gloss** | Arquitetura Elm-like, componentes composáveis |
-| Syntax | **Chroma** | 500+ linguagens, sem CGo, rápido |
-| Estrutura de texto | **Gap Buffer** | O(1) para edições localizadas, simples |
+| Layer | Technology | Reason |
+|-------|------------|--------|
+| Language | **Go 1.23+** | Single binary, cross-compile, predictable performance |
+| TUI | **Bubble Tea + Lip Gloss** | Elm-like architecture, composable components |
+| Syntax | **Chroma** | 500+ languages, no CGo, fast |
+| Text structure | **Gap Buffer** | O(1) for localized edits, simple |
 
 ### Design decisions
 
-- **Modeless-first**: o editor está sempre em modo de inserção. Comandos são acessados via atalhos CUA ou palette.
-- **Progressive disclosure**: funcionalidades avançadas são descobertas gradualmente via command palette.
-- **Single binary**: compilação estática nativa em Go. Distribuição trivial (`scp cmdit servidor:/usr/local/bin/`).
+- **Modeless-first**: the editor is always in insertion mode. Commands are accessed via CUA shortcuts or palette.
+- **Progressive disclosure**: advanced features are gradually discovered via command palette.
+- **Single binary**: native static compilation in Go. Trivial distribution (`scp cmdit server:/usr/local/bin/`).
 
 ---
 
-## 🧪 Testes
+## 🧪 Tests
 
 ```bash
-# Executar todos os testes
+# Run all tests
 go test ./...
 
-# Com cobertura
+# With coverage
 go test ./... -cover
 
-# Resultado atual
-# 65 testes passando em 6 pacotes
-# buffer (17) | clipboard (4) | editor (14) | fileio (4) | renderer (9) | tabs (6)
-# go vet ./... ✅ sem warnings
+# Current result
+# 75 tests passing across 6 packages
+# buffer (17) | clipboard (4) | editor (14) | fileio (4) | renderer (9) | tabs (8)
+# go vet ./... ✅ no warnings
 ```
 
 ---
@@ -266,16 +266,16 @@ go test ./... -cover
 ## 📦 Build
 
 ```bash
-# Build local
+# Local build
 make build          # → bin/cmdit.exe
 
-# Cross-compile (todas as plataformas)
+# Cross-compile (all platforms)
 make build-all      # → bin/cmdit-linux-amd64
                     #   bin/cmdit-windows-amd64.exe
                     #   bin/cmdit-darwin-amd64
                     #   bin/cmdit-darwin-arm64
 
-# Testes + lint
+# Tests + lint
 make test
 make lint
 ```
@@ -284,46 +284,46 @@ make lint
 
 ## 🗺️ Roadmap
 
-| Fase | Status | Descrição |
-|------|--------|-----------|
+| Phase | Status | Description |
+|------|--------|-------------|
 | 0 | ✅ | Scaffold: Go + Bubble Tea |
-| 1 | ✅ | Editor básico: digitar, salvar, sair |
-| 2 | ✅ | Navegação: setas, mouse, scroll, viewport |
-| 3 | ✅ | Edição power: undo, clipboard, busca |
+| 1 | ✅ | Basic editor: type, save, exit |
+| 2 | ✅ | Navigation: arrows, mouse, scroll, viewport |
+| 3 | ✅ | Power editing: undo, clipboard, search |
 | 4 | ✅ | Command palette |
 | 5 | ✅ | Syntax highlighting via Chroma |
-| 6 | ✅ | File picker, welcome screen, recentes |
-| 7 | ✅ | Auto-save, cross-compile, polimento |
-| 8 | ✅ | Múltiplos cursores, abas, splits, indent guides, LSP |
-| 9 | 📋 | Plugins Lua + marketplace |
+| 6 | ✅ | File picker, welcome screen, recent files |
+| 7 | ✅ | Auto-save, cross-compile, polish |
+| 8 | ✅ | Multiple cursors, tabs, splits, indent guides, LSP |
+| 9 | 📋 | Lua plugins + marketplace |
 | 10 | 📋 | Treesitter syntax highlighting |
 
 ---
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-Contribuições são bem-vindas!
+Contributions are welcome!
 
-1. Fork o repositório
-2. Crie uma branch: `git checkout -b feature/nome`
-3. Faça commit: `git commit -m "feat: descrição"`
-4. Push: `git push origin feature/nome`
-5. Abra um Pull Request
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/name`
+3. Commit: `git commit -m "feat: description"`
+4. Push: `git push origin feature/name`
+5. Open a Pull Request
 
-**Convenções de commit:**  
-`feat:` nova funcionalidade  
-`fix:` correção de bug  
-`refactor:` refatoração  
-`test:` testes  
-`docs:` documentação  
-`chore:` manutenção
+**Commit conventions:**
+`feat:` new feature
+`fix:` bug fix
+`refactor:` refactoring
+`test:` tests
+`docs:` documentation
+`chore:` maintenance
 
 ---
 
-## 📄 Licença
+## 📄 License
 
 MIT © 2026 Alexb
 
 ---
 
-**cmdit** — *editor de texto para humanos.*
+**cmdit** — *text editor for humans.*

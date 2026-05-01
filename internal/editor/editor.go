@@ -109,6 +109,10 @@ type Model struct {
 	renameInput string
 	renameError string
 
+	// Error display
+	errorMessage string
+	errorTime    time.Time
+
 	// Multi-cursor state
 	extraCursors []EditorCursor
 
@@ -220,23 +224,23 @@ func NewWithFile(path string) (*Model, error) {
 // registerActions populates the command palette actions.
 func (m *Model) registerActions() {
 	m.paletteActions = []command.Action{
-		{ID: "file.save", Label: "Salvar", Shortcut: "Ctrl+S"},
-		{ID: "file.save-as", Label: "Salvar como", Shortcut: "F3"},
-		{ID: "file.open", Label: "Abrir arquivo", Shortcut: "Ctrl+O"},
-		{ID: "file.quit", Label: "Sair", Shortcut: "Ctrl+Q"},
-		{ID: "edit.undo", Label: "Desfazer", Shortcut: "Ctrl+Z"},
-		{ID: "edit.redo", Label: "Refazer", Shortcut: "Ctrl+Y"},
-		{ID: "edit.cut", Label: "Recortar", Shortcut: "Ctrl+X"},
-		{ID: "edit.copy", Label: "Copiar", Shortcut: "Ctrl+C"},
-		{ID: "edit.paste", Label: "Colar", Shortcut: "Ctrl+V"},
-		{ID: "edit.select-all", Label: "Selecionar tudo", Shortcut: "Ctrl+A"},
-		{ID: "search.find", Label: "Buscar", Shortcut: "Ctrl+F"},
-		{ID: "search.replace", Label: "Substituir", Shortcut: "Ctrl+H"},
-		{ID: "view.go-line", Label: "Ir para linha", Shortcut: "Ctrl+G"},
-		{ID: "file.rename", Label: "Renomear arquivo", Shortcut: "F2"},
+		{ID: "file.save", Label: "Save", Shortcut: "Ctrl+S"},
+		{ID: "file.save-as", Label: "Save As", Shortcut: "F3"},
+		{ID: "file.open", Label: "Open File", Shortcut: "Ctrl+O"},
+		{ID: "file.quit", Label: "Quit", Shortcut: "Ctrl+Q"},
+		{ID: "edit.undo", Label: "Undo", Shortcut: "Ctrl+Z"},
+		{ID: "edit.redo", Label: "Redo", Shortcut: "Ctrl+Y"},
+		{ID: "edit.cut", Label: "Cut", Shortcut: "Ctrl+X"},
+		{ID: "edit.copy", Label: "Copy", Shortcut: "Ctrl+C"},
+		{ID: "edit.paste", Label: "Paste", Shortcut: "Ctrl+V"},
+		{ID: "edit.select-all", Label: "Select All", Shortcut: "Ctrl+A"},
+		{ID: "search.find", Label: "Find", Shortcut: "Ctrl+F"},
+		{ID: "search.replace", Label: "Replace", Shortcut: "Ctrl+H"},
+		{ID: "view.go-line", Label: "Go to Line", Shortcut: "Ctrl+G"},
+		{ID: "file.rename", Label: "Rename File", Shortcut: "F2"},
 		{ID: "view.toggle-auto-close", Label: "Toggle Auto-Close Brackets", Shortcut: "F4"},
-		{ID: "view.toggle-vim-mode", Label: "Toggle Modo Vim", Shortcut: "F5"},
-		{ID: "view.next-theme", Label: "Proximo Tema", Shortcut: "F6"},
+		{ID: "view.toggle-vim-mode", Label: "Toggle Vim Mode", Shortcut: "F5"},
+		{ID: "view.next-theme", Label: "Next Theme", Shortcut: "F6"},
 		{ID: "view.toggle-word-wrap", Label: "Toggle Word Wrap", Shortcut: "Alt+Z"},
 		{ID: "file.toggle-format-on-save", Label: "Toggle Format on Save", Shortcut: ""},
 		{ID: "file.toggle-auto-save", Label: "Toggle Auto Save", Shortcut: "F9"},
@@ -249,6 +253,10 @@ func (m *Model) Init() tea.Cmd {
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case clearErrorMsg:
+		m.errorMessage = ""
+		return m, nil
+
 	case autoSaveMsg:
 		if m.modified && m.filename != "" && m.mode == ModeNormal && m.config.AutoSaveEnabled {
 			m.save()
@@ -564,7 +572,7 @@ func validateFileName(name string) error {
 	invalid := []rune{'/', '\\', ':', '*', '?', '"', '<', '>', '|'}
 	for _, c := range invalid {
 		if strings.ContainsRune(name, c) {
-			return fmt.Errorf("caractere invalido: %c", c)
+			return fmt.Errorf("invalid character: %c", c)
 		}
 	}
 	return nil

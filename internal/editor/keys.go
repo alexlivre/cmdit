@@ -669,7 +669,7 @@ func (m *Model) confirmRename() (tea.Model, tea.Cmd) {
 	oldPath := m.filename
 
 	if newName == "" {
-		m.renameError = "Nome nao pode estar vazio."
+		m.renameError = "Name cannot be empty."
 		return m, nil
 	}
 	if newName == filepath.Base(oldPath) {
@@ -685,7 +685,7 @@ func (m *Model) confirmRename() (tea.Model, tea.Cmd) {
 	if m.modified {
 		m.save()
 		if m.modified {
-			m.renameError = "Erro ao salvar antes de renomear."
+			m.renameError = "Error saving before rename."
 			return m, nil
 		}
 	}
@@ -694,12 +694,12 @@ func (m *Model) confirmRename() (tea.Model, tea.Cmd) {
 	newPath := filepath.Join(dir, newName)
 
 	if _, err := os.Stat(newPath); err == nil {
-		m.renameError = fmt.Sprintf("Arquivo ja existe: %s", newName)
+		m.renameError = fmt.Sprintf("File already exists: %s", newName)
 		return m, nil
 	}
 
 	if err := fileio.Rename(oldPath, newPath); err != nil {
-		m.renameError = fmt.Sprintf("Erro ao renomear: %v", err)
+		m.renameError = fmt.Sprintf("Error renaming: %v", err)
 		return m, nil
 	}
 

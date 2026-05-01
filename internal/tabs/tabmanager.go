@@ -74,7 +74,7 @@ func NewWithFile(path string) (*TabManager, error) {
 func (tm *TabManager) addTab(m *editor.Model) {
 	name := filepath.Base(m.Filename())
 	if name == "" || name == "." {
-		name = "[novo]"
+		name = "[new]"
 	}
 	tm.tabs = append(tm.tabs, &Tab{
 		Editor: m,

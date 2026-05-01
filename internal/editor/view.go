@@ -197,13 +197,13 @@ func (m *Model) applyIndentGuides(lineText string, rawLine string) string {
 
 func (m *Model) renderSearchBar() string {
 	if m.mode == ModeReplace {
-		s := fmt.Sprintf("Buscar: %s  Substituir: %s", m.searchQuery, m.replaceQuery)
+		s := fmt.Sprintf("Find: %s  Replace: %s", m.searchQuery, m.replaceQuery)
 		if len(m.searchMatches) > 0 {
 			s += fmt.Sprintf("  [%d/%d]", m.searchCurrent+1, len(m.searchMatches))
 		}
 		return m.searchStyle.Render(s)
 	}
-	s := fmt.Sprintf("Buscar: %s", m.searchQuery)
+	s := fmt.Sprintf("Find: %s", m.searchQuery)
 	if len(m.searchMatches) > 0 {
 		s += fmt.Sprintf("  [%d/%d]", m.searchCurrent+1, len(m.searchMatches))
 	}
@@ -215,7 +215,7 @@ func (m *Model) renderSearchBar() string {
 func (m *Model) renderStatus() string {
 	fname := m.filename
 	if fname == "" {
-		fname = "[novo]"
+		fname = "[new]"
 	}
 	modified := ""
 	if m.modified {
@@ -277,9 +277,17 @@ func (m *Model) renderStatus() string {
 	}
 
 	// Show theme
-	themeIndicator := fmt.Sprintf(" [Tema:%s]", m.config.Theme)
+	themeIndicator := fmt.Sprintf(" [Theme:%s]", m.config.Theme)
 
-	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + autoSaveIndicator + vimIndicator + themeIndicator + "  Ctrl+S Salvar  Ctrl+Q Sair")
+	status := fname + modified + "  " + pos + mcInfo + diagInfo + autoSaveIndicator + vimIndicator + themeIndicator + "  Ctrl+S Save  Ctrl+Q Quit"
+
+	// Show error overlay if active
+	if m.errorMessage != "" {
+		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("160")).Padding(0, 2)
+		return m.statusStyle.Render(status) + "\n" + errStyle.Render(" "+m.errorMessage+" ")
+	}
+
+	return m.statusStyle.Render(status)
 }
 
 // --- Confirm dialog ---
@@ -287,11 +295,11 @@ func (m *Model) renderStatus() string {
 func (m *Model) renderConfirm() string {
 	var msg string
 	if m.confirmAction == ConfirmQuit {
-		msg = "Arquivo modificado! Deseja salvar antes de sair?"
+		msg = "File modified! Save before quitting?"
 	} else {
-		msg = "Arquivo modificado! Deseja salvar antes de fechar?"
+		msg = "File modified! Save before closing?"
 	}
-	btns := "\n\n" + m.confirmBtnStyle.Render("[S] Salvar") + "  [D] Descartar  [C] Cancelar"
+	btns := "\n\n" + m.confirmBtnStyle.Render("[S] Save") + "  [D] Discard  [C] Cancel"
 	dialog := m.confirmStyle.Render(msg + btns)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
 }
@@ -313,10 +321,10 @@ func (m *Model) renderPalette() string {
 	items = append(items, m.paletteInput.Render("> "+m.paletteQuery))
 
 	if len(m.paletteQuery) == 0 {
-		items = append(items, m.paletteShortcut.Render("  Digite para buscar comandos..."))
+		items = append(items, m.paletteShortcut.Render("  Type to search commands..."))
 	}
 	if len(m.paletteResults) == 0 && len(m.paletteQuery) > 0 {
-		items = append(items, m.paletteShortcut.Render("  Nenhum comando encontrado"))
+		items = append(items, m.paletteShortcut.Render("  No commands found"))
 	}
 
 	for i := start; i < end; i++ {
@@ -340,8 +348,8 @@ func (m *Model) renderPalette() string {
 // --- Welcome Screen ---
 
 func (m *Model) renderWelcome() string {
-	logo := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render("  cmdit v0.2.0")
-	subtitle := "Editor de texto para humanos"
+	logo := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render("  cmdit v0.4.1")
+	subtitle := "Text editor for humans"
 
 	var lines []string
 	lines = append(lines, logo)
@@ -350,7 +358,7 @@ func (m *Model) renderWelcome() string {
 	lines = append(lines, "")
 
 	if len(m.recentFiles) > 0 {
-		lines = append(lines, lipgloss.NewStyle().Bold(true).Render("Arquivos recentes:"))
+		lines = append(lines, lipgloss.NewStyle().Bold(true).Render("Recent files:"))
 		for i, f := range m.recentFiles {
 			if i >= 5 {
 				break
@@ -360,11 +368,11 @@ func (m *Model) renderWelcome() string {
 		lines = append(lines, "")
 	}
 
-	lines = append(lines, "Ctrl+O  Abrir arquivo")
-	lines = append(lines, "Ctrl+P  Paleta de comandos")
-	lines = append(lines, "Ctrl+Q  Sair")
+	lines = append(lines, "Ctrl+O  Open file")
+	lines = append(lines, "Ctrl+P  Command palette")
+	lines = append(lines, "Ctrl+Q  Quit")
 	lines = append(lines, "")
-	lines = append(lines, "Comece a digitar para criar um novo arquivo...")
+	lines = append(lines, "Start typing to create a new file...")
 
 	content := strings.Join(lines, "\n")
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
@@ -374,7 +382,7 @@ func (m *Model) renderWelcome() string {
 
 func (m *Model) renderFilePicker() string {
 	var lines []string
-	lines = append(lines, fmt.Sprintf("Abrir: %s > %s", m.filePickerDir, m.filePickerQuery))
+	lines = append(lines, fmt.Sprintf("Open: %s > %s", m.filePickerDir, m.filePickerQuery))
 	lines = append(lines, "")
 
 	start := m.filePickerSel - 10
@@ -407,11 +415,11 @@ func (m *Model) renderFilePicker() string {
 
 func (m *Model) renderSaveAs() string {
 	var lines []string
-	lines = append(lines, "Salvar como:")
+	lines = append(lines, "Save as:")
 	lines = append(lines, "")
 	lines = append(lines, "> "+m.saveAsQuery)
 	lines = append(lines, "")
-	lines = append(lines, "Enter para confirmar, Esc para cancelar")
+	lines = append(lines, "Enter to confirm, Esc to cancel")
 
 	content := strings.Join(lines, "\n")
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
@@ -423,12 +431,12 @@ func (m *Model) renderSaveAs() string {
 func (m *Model) renderRenameBar() string {
 	oldName := m.filename
 	if oldName == "" {
-		oldName = "(novo)"
+		oldName = "(new)"
 	}
 	if len(oldName) > 30 {
 		oldName = "..." + oldName[len(oldName)-27:]
 	}
-	s := fmt.Sprintf("Renomear: %s → %s", oldName, m.renameInput)
+	s := fmt.Sprintf("Rename: %s → %s", oldName, m.renameInput)
 	if m.renameError != "" {
 		s += "  " + lipgloss.NewStyle().
 			Foreground(lipgloss.Color("203")).
