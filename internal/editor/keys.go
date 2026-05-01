@@ -34,6 +34,15 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Custom keybindings: check config overrides BEFORE normal dispatch
+	if len(m.config.Keybindings) > 0 {
+		keyStr := msg.String()
+		if actionID, ok := m.config.Keybindings[keyStr]; ok {
+			m.executeAction(actionID)
+			return m, nil
+		}
+	}
+
 	if m.mode == ModeWelcome {
 		return m.handleWelcomeKey(msg)
 	}
