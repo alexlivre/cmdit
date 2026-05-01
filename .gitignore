@@ -9,6 +9,16 @@ bin/
 # Test artifacts
 *.test
 *.out
+test_temp.go
+test_cmdit.ps1
+cmd/cmdit-test/
+internal/tabs/README.md
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
 
 # Go workspace
 go.work
