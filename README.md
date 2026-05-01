@@ -1,8 +1,8 @@
 # cmdit — Text editor for humans in the terminal
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev)
-[![Tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-v0.4.1-blue)](https://github.com/alexlivre/cmdit/releases)
+[![Tests](https://img.shields.io/badge/tests-86%2B%20passing-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-v0.4.2-blue)](https://github.com/alexlivre/cmdit/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
 
@@ -67,7 +67,19 @@ A single binary, zero dependencies.
 
 ## ⚡ Installation
 
-### Pre-compiled (recommended)
+### One-liner (recommended)
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/alexlivre/cmdit/main/install.ps1 | iex
+```
+
+**Linux / macOS:**
+```bash
+curl -sSL https://raw.githubusercontent.com/alexlivre/cmdit/main/install.sh | bash
+```
+
+### Pre-compiled
 
 ```bash
 # Download the binary for your platform at:
@@ -295,8 +307,9 @@ make lint
 | 6 | ✅ | File picker, welcome screen, recent files |
 | 7 | ✅ | Auto-save, cross-compile, polish |
 | 8 | ✅ | Multiple cursors, tabs, splits, indent guides, LSP |
-| 9 | 📋 | Lua plugins + marketplace |
-| 10 | 📋 | Treesitter syntax highlighting |
+| 9 | ✅ | Built-in features: auto-close, vim mode, themes, format, keybindings |
+| 10 | ✅ | Quality & stability: errors, security, coverage, benchmarks |
+| 11 | ✅ | Production: installers, quickstart, cheatsheet |
 
 ---
 
