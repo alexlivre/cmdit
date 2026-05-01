@@ -24,6 +24,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.WordWrap {
 		t.Error("WordWrap should be false by default")
 	}
+	if !cfg.AutoSaveEnabled {
+		t.Error("AutoSaveEnabled should be true by default")
+	}
 	if cfg.Keybindings == nil {
 		t.Error("Keybindings should not be nil by default")
 	}
@@ -38,6 +41,7 @@ func TestConfigRoundtrip(t *testing.T) {
 		VimMode:          true,
 		FormatOnSave:     true,
 		WordWrap:         true,
+		AutoSaveEnabled:  false,
 		Theme:            "monokai",
 		Keybindings: map[string]string{
 			"ctrl+s": "file.save",
@@ -103,6 +107,7 @@ func TestSaveLoadConfigRoundtrip(t *testing.T) {
 		VimMode:          true,
 		FormatOnSave:     true,
 		WordWrap:         true,
+		AutoSaveEnabled:  false,
 		Theme:            "dracula",
 		Keybindings: map[string]string{
 			"ctrl+j": "file.save",
@@ -132,6 +137,9 @@ func TestSaveLoadConfigRoundtrip(t *testing.T) {
 	}
 	if loaded.WordWrap != cfg.WordWrap {
 		t.Errorf("WordWrap: expected %v, got %v", cfg.WordWrap, loaded.WordWrap)
+	}
+	if loaded.AutoSaveEnabled != cfg.AutoSaveEnabled {
+		t.Errorf("AutoSaveEnabled: expected %v, got %v", cfg.AutoSaveEnabled, loaded.AutoSaveEnabled)
 	}
 	if loaded.Theme != cfg.Theme {
 		t.Errorf("Theme: expected '%s', got '%s'", cfg.Theme, loaded.Theme)

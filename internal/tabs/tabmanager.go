@@ -236,7 +236,11 @@ func (tm *TabManager) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return tm, tea.Quit
 
-	case key == "ctrl+tab", key == "ctrl+v":
+	case key == "f7":
+		tm.prevTab()
+		return tm, nil
+
+	case key == "f8":
 		tm.nextTab()
 		return tm, nil
 

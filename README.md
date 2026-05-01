@@ -39,10 +39,10 @@ Um único binário, zero dependências.
 - ✅ **Busca e substituição** — Ctrl+F / Ctrl+H com destaque de todas as ocorrências.
 - ✅ **File picker integrado** — Ctrl+O para abrir arquivos navegando por diretórios.
 - ✅ **Renomear arquivo** — F2 renomeia o arquivo atual com input inline.
-- ✅ **Auto-save** — Salva automaticamente a cada 30 segundos.
+- ✅ **Auto-save** — Salva automaticamente a cada 30 segundos. `F9` ativa/desativa. Indicador `[AutoSave]` na barra de status.
 - ✅ **Tela de boas-vindas** — Mostra arquivos recentes ao abrir sem arquivo.
 - ✅ **Diálogo de confirmação** — Avisa ao sair se houver alterações não salvas.
-- ✅ **Abas** — Ctrl+T nova aba, Ctrl+W fecha, Ctrl+Tab alterna, Ctrl+1-9 salta. Indicador ● para arquivos modificados.
+- ✅ **Abas** — Ctrl+T nova aba, Ctrl+W fecha, F8 próxima, F7 anterior, Ctrl+1-9 salta. Indicador ● para arquivos modificados.
 - ✅ **Múltiplos cursores** — Ctrl+D adiciona cursor na próxima ocorrência da palavra, Escape limpa. Edição simultânea em todos os cursores.
 - ✅ **Splits** — Ctrl+\ divide a tela horizontalmente. Clique para focar painel, Ctrl+\ alterna foco.
 - ✅ **Indent guides** — Linhas verticais sutis nos níveis de indentação.
@@ -122,6 +122,7 @@ cmdit
 | `Ctrl+O` | Abrir arquivo |
 | `F3` | Salvar como |
 | `F2` | Renomear arquivo |
+| `F9` | Ativar/desativar auto-save |
 | `Ctrl+Q` | Sair |
 
 ### Abas e Splits
@@ -130,7 +131,8 @@ cmdit
 |--------|------|
 | `Ctrl+T` | Nova aba |
 | `Ctrl+W` | Fechar aba |
-| `Ctrl+Tab` | Próxima aba |
+| `F8` | Próxima aba |
+| `F7` | Aba anterior |
 | `Ctrl+1-9` | Ir para aba N |
 | `Ctrl+\` | Criar/alternar split |
 

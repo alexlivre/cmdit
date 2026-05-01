@@ -239,6 +239,7 @@ func (m *Model) registerActions() {
 		{ID: "view.next-theme", Label: "Proximo Tema", Shortcut: "F6"},
 		{ID: "view.toggle-word-wrap", Label: "Toggle Word Wrap", Shortcut: "Alt+Z"},
 		{ID: "file.toggle-format-on-save", Label: "Toggle Format on Save", Shortcut: ""},
+		{ID: "file.toggle-auto-save", Label: "Toggle Auto Save", Shortcut: "F9"},
 	}
 }
 
@@ -249,7 +250,7 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case autoSaveMsg:
-		if m.modified && m.filename != "" && m.mode == ModeNormal {
+		if m.modified && m.filename != "" && m.mode == ModeNormal && m.config.AutoSaveEnabled {
 			m.save()
 		}
 		return m, autoSaveTick()

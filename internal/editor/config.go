@@ -12,6 +12,7 @@ type Config struct {
 	VimMode          bool              `json:"vim_mode"`
 	FormatOnSave     bool              `json:"format_on_save"`
 	WordWrap         bool              `json:"word_wrap"`
+	AutoSaveEnabled  bool              `json:"auto_save_enabled"`
 	Theme            string            `json:"theme"`
 	Keybindings      map[string]string `json:"keybindings"`
 }
@@ -23,6 +24,7 @@ func DefaultConfig() Config {
 		VimMode:          false,
 		FormatOnSave:     false,
 		WordWrap:         false,
+		AutoSaveEnabled:  true,
 		Theme:            "dark",
 		Keybindings:      map[string]string{},
 	}

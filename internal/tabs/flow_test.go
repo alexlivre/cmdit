@@ -170,8 +170,7 @@ func TestCtrlWOnCleanTab(t *testing.T) {
 	}
 }
 
-// TestNextTabWrapsAround tests that Ctrl+Tab cycles through tabs
-// Note: Ctrl+Tab maps to ctrl+v in Bubble Tea (Type=22)
+// TestNextTabWrapsAround tests that F8 cycles through tabs
 func TestNextTabWrapsAround(t *testing.T) {
 	tm, err := NewWithFile("README.md")
 	if err != nil {
@@ -181,11 +180,37 @@ func TestNextTabWrapsAround(t *testing.T) {
 	// Create a second tab
 	tm.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
 
-	// Ctrl+Tab (ctrl+v) should cycle back to first tab
-	tm.Update(tea.KeyMsg{Type: tea.KeyCtrlV})
+	// F8 should cycle back to first tab
+	tm.Update(tea.KeyMsg{Type: tea.KeyF8})
 	ed := tm.ActiveEditor()
 	if ed.Filename() != "README.md" {
 		t.Errorf("expected to be on README.md, got %s", ed.Filename())
 	}
-	t.Log("✅ PASS: Ctrl+Tab wraps around correctly")
+	t.Log("✅ PASS: F8 wraps around correctly")
+}
+
+// TestPrevTabGoesBack tests that F7 goes to previous tab
+func TestPrevTabGoesBack(t *testing.T) {
+	tm, err := NewWithFile("README.md")
+	if err != nil {
+		t.Fatalf("NewWithFile failed: %v", err)
+	}
+
+	// Create second and third tabs
+	tm.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	tm.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+
+	// Go back one tab with F7
+	tm.Update(tea.KeyMsg{Type: tea.KeyF7})
+	if tm.activeIdx != 1 {
+		t.Errorf("expected active tab 1 after F7, got %d", tm.activeIdx)
+	}
+
+	// F7 again should go to first tab
+	tm.Update(tea.KeyMsg{Type: tea.KeyF7})
+	if tm.activeIdx != 0 {
+		t.Errorf("expected active tab 0 after second F7, got %d", tm.activeIdx)
+	}
+
+	t.Log("✅ PASS: F7 goes back correctly")
 }

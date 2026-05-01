@@ -69,6 +69,9 @@ func (m *Model) executeAction(id string) {
 	case "file.toggle-format-on-save":
 		m.config.FormatOnSave = !m.config.FormatOnSave
 		SaveConfig(m.config)
+	case "file.toggle-auto-save":
+		m.config.AutoSaveEnabled = !m.config.AutoSaveEnabled
+		SaveConfig(m.config)
 	}
 }
 
@@ -76,7 +79,8 @@ func (m *Model) executeAction(id string) {
 
 func (m *Model) save() {
 	if m.filename == "" {
-		m.filename = "untitled.txt"
+		m.enterSaveAs()
+		return
 	}
 	if err := fileio.Save(m.filename, m.buf); err == nil {
 		m.modified = false

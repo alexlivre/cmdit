@@ -270,10 +270,16 @@ func (m *Model) renderStatus() string {
 		vimIndicator = " [VIM]"
 	}
 
+	// Show auto-save indicator
+	autoSaveIndicator := ""
+	if m.config.AutoSaveEnabled {
+		autoSaveIndicator = " [AutoSave]"
+	}
+
 	// Show theme
 	themeIndicator := fmt.Sprintf(" [Tema:%s]", m.config.Theme)
 
-	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + vimIndicator + themeIndicator + "  Ctrl+S Salvar  Ctrl+Q Sair")
+	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + autoSaveIndicator + vimIndicator + themeIndicator + "  Ctrl+S Salvar  Ctrl+Q Sair")
 }
 
 // --- Confirm dialog ---

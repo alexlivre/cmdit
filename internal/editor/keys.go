@@ -100,6 +100,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "f9":
+		if m.mode == ModeNormal {
+			m.executeAction("file.toggle-auto-save")
+		}
+		return m, nil
+
 	case "ctrl+q":
 		if m.modified {
 			m.mode = ModeConfirm
