@@ -5,9 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-05-01
+## [0.4.2] — 2026-05-01
 
-### Added — Fase 9: Features Built-in
+### Added — Phase 10 & 11: Quality, Stability, Production
+
+- **English translation** — All UI strings, palette commands, status bar, confirm dialogs, welcome screen, and error messages translated to English. README, QUICKSTART, and CHEATSHEET in English.
+- **Error handling** — `internal/editor/errors.go` with `showError()` (status bar overlay in red), `logError()` (writes to `~/.cmdit/cmdit.log` with stack trace), and `safeRun()` (panic recovery wrapper).
+- **Security** — Path traversal prevention via `filepath.Clean()` in `openFile()`. Escape sequence sanitization test. Filename validation blocks `../` and special characters.
+- **Installers** — `install.sh` (Linux/macOS) and `install.ps1` (Windows PowerShell). One-liner install: `curl -sSL .../install.sh | bash` or `irm .../install.ps1 | iex`.
+- **Documentation** — `QUICKSTART.md` ("5 minutes to master cmdit"), `CHEATSHEET.md` (complete keyboard shortcut reference).
+- **Benchmarks** — 5 benchmarks: `BenchmarkBufferInsert`, `BenchmarkBufferInsertWithCursor`, `BenchmarkRenderSmallFile`, `BenchmarkRenderLargeFile`, `BenchmarkSearchInLargeFile`.
+- **Edge case tests** — Binary file handling, empty file, single line 10K chars, undo/redo to empty, multi-cursor dedup, vim mode normal behavior.
+- **Welcome screen** — Version display updated to `v0.4.2 — Text editor for humans`.
+
+### Changed
+
+- **Coverage** — Editor: 34% → 46%. Tabs: 22% → 26%. Overall: 36% → 40%.
+- **Total tests:** 86+ (was 75). All `go vet` clean.
+- **Config tests** — Now use temporary directories (no longer depend on real `~/.cmdit/config.json`).
+- **Roadmap** — All 11 phases marked complete.
+
+---
+
+## [0.4.1] — 2026-05-01
+
+### Changed
+
+- **Tab navigation** — `F7` (previous tab) and `F8` (next tab) replace `Ctrl+Tab`/`Ctrl+V`. `Ctrl+V` restored as Paste. Reason: `Ctrl+Tab` captured by terminal emulators, `Ctrl+V` conflicted with paste.
+- **First save** — `Ctrl+S` on an unnamed file now opens the "Save As" prompt instead of defaulting to `untitled.txt`.
+- **Welcome screen** — Version bumped to `v0.4.1`.
+
+### Added
+
+- **Auto-save toggle** — `F9` toggles auto-save on/off. `[AutoSave]` indicator in status bar. `auto_save_enabled` field in `config.json` (default: true).
+- **Config tests** — `AutoSaveEnabled` field tested in roundtrip, defaults, and save/load.
+
+---
+
+## [0.4.0] — 2026-05-01
+
+### Added — Fase 9: Built-in Features
 
 - **Config System** — `~/.cmdit/config.json` with fields: `auto_close_enabled`, `vim_mode`, `format_on_save`, `word_wrap`, `theme`, `keybindings`. Persists all user preferences between sessions.
 - **Auto-Close Brackets** — Automatically closes `() [] {} "" '' \`\`` pairs. Smart-skip: typing the closing character skips over the auto-inserted one. Toggle with `F4`.
