@@ -57,11 +57,11 @@ A single binary, zero dependencies.
 - ✅ **Single binary** — One file. Copy and run. Zero dependencies.
 - ✅ **Cross-platform** — Windows, Linux, macOS. Desktop and SSH server.
 
-### 📋 Planned (v3)
+### 📋 Planned (v5)
 
 - 🔲 Treesitter for precise syntax highlighting
-- 🔲 Lua plugins
-- 🔲 Optional Vim keymap via plugin
+- 🔲 Rope data structure for large files
+- 🔲 Auto-complete popup (LSP)
 
 ---
 
@@ -268,9 +268,10 @@ go test ./...
 go test ./... -cover
 
 # Current result
-# 75 tests passing across 6 packages
-# buffer (17) | clipboard (4) | editor (14) | fileio (4) | renderer (9) | tabs (8)
+# 86+ tests passing across 6 packages
+# buffer (17) | clipboard (4) | editor (25+) | fileio (4) | renderer (9) | tabs (12)
 # go vet ./... ✅ no warnings
+# 5 benchmarks passing
 ```
 
 ---
