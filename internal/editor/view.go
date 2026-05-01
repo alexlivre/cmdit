@@ -226,7 +226,10 @@ func (m *Model) renderStatus() string {
 		vimIndicator = " [VIM]"
 	}
 
-	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + vimIndicator + "  Ctrl+S Salvar  Ctrl+Q Sair")
+	// Show theme
+	themeIndicator := fmt.Sprintf(" [Tema:%s]", m.config.Theme)
+
+	return m.statusStyle.Render(fname + modified + "  " + pos + mcInfo + diagInfo + vimIndicator + themeIndicator + "  Ctrl+S Salvar  Ctrl+Q Sair")
 }
 
 // --- Confirm dialog ---

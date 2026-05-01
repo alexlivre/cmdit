@@ -85,6 +85,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "f6":
+		if m.mode == ModeNormal {
+			m.executeAction("view.next-theme")
+		}
+		return m, nil
+
 	case "ctrl+q":
 		if m.modified {
 			m.mode = ModeConfirm
