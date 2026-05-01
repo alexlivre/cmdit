@@ -13,6 +13,7 @@ test_temp.go
 test_cmdit.ps1
 cmd/cmdit-test/
 internal/tabs/README.md
+test-automation/
 
 # Screenshots
 *.png
