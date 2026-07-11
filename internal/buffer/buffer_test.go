@@ -45,7 +45,7 @@ func TestDeleteBackspace(t *testing.T) {
 		b.MoveGapRight()
 	}
 
-	deleted := b.Delete()
+	deleted := b.Backspace()
 	if !deleted {
 		t.Error("expected deletion to succeed")
 	}
@@ -56,7 +56,7 @@ func TestDeleteBackspace(t *testing.T) {
 
 func TestDeleteFromEmptyBuffer(t *testing.T) {
 	b := NewBuffer()
-	deleted := b.Delete()
+	deleted := b.Backspace()
 	if deleted {
 		t.Error("expected deletion to fail on empty buffer")
 	}
@@ -234,5 +234,124 @@ func TestLineColNegative(t *testing.T) {
 	line, col := b.LineCol(-1)
 	if line != 0 || col != 0 {
 		t.Errorf("LineCol(-1) = (%d,%d), expected (0,0)", line, col)
+	}
+}
+
+func TestMoveGapTo(t *testing.T) {
+	b := NewBufferFromString("hello world")
+
+	b.MoveGapTo(5)
+	if b.GapPosition() != 5 {
+		t.Errorf("expected gap at 5, got %d", b.GapPosition())
+	}
+
+	b.MoveGapTo(0)
+	if b.GapPosition() != 0 {
+		t.Errorf("expected gap at 0, got %d", b.GapPosition())
+	}
+
+	b.MoveGapTo(11)
+	if b.GapPosition() != 11 {
+		t.Errorf("expected gap at 11, got %d", b.GapPosition())
+	}
+
+	if b.String() != "hello world" {
+		t.Errorf("content changed: %s", b.String())
+	}
+}
+
+func TestMoveGapTo_OutOfBounds(t *testing.T) {
+	b := NewBufferFromString("test")
+	b.MoveGapTo(100)
+	if b.GapPosition() != 4 {
+		t.Errorf("expected clamp to 4, got %d", b.GapPosition())
+	}
+	b.MoveGapTo(-10)
+	if b.GapPosition() != 0 {
+		t.Errorf("expected clamp to 0, got %d", b.GapPosition())
+	}
+}
+
+func TestLines_Cached(t *testing.T) {
+	b := NewBufferFromString("line1\nline2\nline3")
+
+	lines := b.Lines()
+	if len(lines) != 3 {
+		t.Errorf("expected 3 lines, got %d", len(lines))
+	}
+	if lines[0] != "line1" || lines[1] != "line2" || lines[2] != "line3" {
+		t.Errorf("unexpected lines: %v", lines)
+	}
+
+	lines2 := b.Lines()
+	if len(lines2) != 3 {
+		t.Errorf("cached call failed")
+	}
+}
+
+func TestLines_InvalidateOnInsert(t *testing.T) {
+	b := NewBufferFromString("hello\nworld")
+	_ = b.Lines()
+
+	b.MoveGapTo(5)
+	b.Insert('\n')
+
+	lines := b.Lines()
+	if len(lines) != 3 {
+		t.Errorf("expected 3 lines after insert, got %d", len(lines))
+	}
+}
+
+func TestLineCount_Cached(t *testing.T) {
+	b := NewBufferFromString("a\nb\nc\nd")
+	if b.LineCount() != 4 {
+		t.Errorf("expected 4 lines, got %d", b.LineCount())
+	}
+}
+
+func TestLineStart_Cached(t *testing.T) {
+	b := NewBufferFromString("hello\nworld\nfoo")
+	if b.LineStart(0) != 0 {
+		t.Errorf("line 0 start: expected 0, got %d", b.LineStart(0))
+	}
+	if b.LineStart(1) != 6 {
+		t.Errorf("line 1 start: expected 6, got %d", b.LineStart(1))
+	}
+	if b.LineStart(2) != 12 {
+		t.Errorf("line 2 start: expected 12, got %d", b.LineStart(2))
+	}
+}
+
+func TestInsertString_Empty(t *testing.T) {
+	b := NewBuffer()
+	b.InsertString("")
+	if b.Len() != 0 {
+		t.Errorf("expected length 0, got %d", b.Len())
+	}
+}
+
+func TestDeleteForward_AtEnd(t *testing.T) {
+	b := NewBufferFromString("test")
+	b.MoveGapTo(4)
+	if b.DeleteForward() {
+		t.Error("expected false when deleting at end")
+	}
+}
+
+func TestBackspace_AtStart(t *testing.T) {
+	b := NewBufferFromString("test")
+	b.MoveGapTo(0)
+	if b.Backspace() {
+		t.Error("expected false when backspacing at start")
+	}
+}
+
+func TestRuneAt_OutOfBounds(t *testing.T) {
+	b := NewBufferFromString("test")
+	if b.RuneAt(-1) != 0 {
+		t.Error("expected 0 for negative index")
+	}
+	if b.RuneAt(100) != 0 {
+		t.Error("expected 0 for out of bounds index")
 	}
 }

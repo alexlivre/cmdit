@@ -1,10 +1,17 @@
 package buffer
 
+type OpType int
+
+const (
+	OpInsert OpType = iota
+	OpDelete
+)
+
 // Operation represents a reversible edit operation.
 type Operation struct {
-	Type string // "insert" or "delete"
-	Pos  int    // Position in the logical text
-	Text string // Text inserted or deleted
+	Type OpType
+	Pos  int
+	Text string
 }
 
 // UndoStack provides unlimited undo/redo for buffer operations.

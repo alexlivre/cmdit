@@ -167,3 +167,57 @@ func newTestBuffer() *buffer.Buffer {
 func newTestBufferWithString(s string) *buffer.Buffer {
 	return buffer.NewBufferFromString(s)
 }
+
+func TestLoad_TooLarge(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "large.txt")
+	content := make([]byte, maxFileSize+1)
+	for i := range content {
+		content[i] = 'x'
+	}
+	os.WriteFile(tmpFile, content, 0644)
+
+	_, err := Load(tmpFile)
+	if err == nil {
+		t.Error("expected error for large file")
+	}
+}
+
+func TestLoad_WithinLimit(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "normal.txt")
+	os.WriteFile(tmpFile, []byte("hello world"), 0644)
+
+	buf, err := Load(tmpFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.String() != "hello world" {
+		t.Errorf("unexpected content: %s", buf.String())
+	}
+}
+
+func TestLoad_EmptyFile(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "empty.txt")
+	os.WriteFile(tmpFile, []byte{}, 0644)
+
+	buf, err := Load(tmpFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected empty buffer, got length %d", buf.Len())
+	}
+}
+
+func TestSave_EmptyBuffer(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "empty.txt")
+	b := buffer.NewBuffer()
+	err := Save(tmpFile, b)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(tmpFile)
+	if len(data) != 0 {
+		t.Errorf("expected empty file, got %d bytes", len(data))
+	}
+}

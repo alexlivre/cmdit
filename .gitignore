@@ -45,4 +45,7 @@ temp/
 
 # Qwen local config
 .qwen/
-".playwright-mcp/"  
+".playwright-mcp/"
+
+# OpenCode plans
+.opencode/

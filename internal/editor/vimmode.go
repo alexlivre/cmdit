@@ -332,7 +332,7 @@ func (m *Model) vimDeleteChar(n int) {
 	}
 	if len(deleted) > 0 {
 		m.undoStack.Push(buffer.Operation{
-			Type: "insert",
+			Type: buffer.OpInsert,
 			Pos:  pos,
 			Text: deleted,
 		})
@@ -361,7 +361,7 @@ func (m *Model) vimDeleteLine() {
 		undoText += "\n"
 	}
 	m.undoStack.Push(buffer.Operation{
-		Type: "insert",
+		Type: buffer.OpInsert,
 		Pos:  lineStart,
 		Text: undoText,
 	})
@@ -405,7 +405,7 @@ func (m *Model) vimPasteAfter() {
 	}
 
 	m.undoStack.Push(buffer.Operation{
-		Type: "delete",
+		Type: buffer.OpDelete,
 		Pos:  m.buf.GapPosition(),
 		Text: text,
 	})
@@ -422,7 +422,7 @@ func (m *Model) vimPasteBefore() {
 	text := m.clipboard.Paste()
 
 	m.undoStack.Push(buffer.Operation{
-		Type: "delete",
+		Type: buffer.OpDelete,
 		Pos:  m.buf.GapPosition(),
 		Text: text,
 	})

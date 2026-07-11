@@ -2,13 +2,24 @@
 package fileio
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/alexb/cmdit/internal/buffer"
 )
 
+const maxFileSize = 100 * 1024 * 1024 // 100MB
+
 // Load reads a file and returns a buffer with its contents.
 func Load(path string) (*buffer.Buffer, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() > maxFileSize {
+		return nil, fmt.Errorf("file too large: %d bytes (max %d bytes)", info.Size(), maxFileSize)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

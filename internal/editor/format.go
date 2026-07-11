@@ -1,8 +1,11 @@
 package editor
 
 import (
+	"context"
+	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/alexb/cmdit/internal/buffer"
 )
@@ -17,6 +20,8 @@ var formatters = map[string]struct {
 	"rust":   {cmd: "rustfmt"},
 }
 
+var formatterWarned = make(map[string]bool)
+
 // formatBuffer runs the appropriate formatter on the buffer content.
 // Returns the formatted text, or the original text if no formatter
 // is available or the formatter is not installed.
@@ -26,18 +31,25 @@ func (m *Model) formatBuffer() (string, error) {
 
 	fmtr, ok := formatters[lang]
 	if !ok || fmtr.cmd == "" {
-		return text, nil // no formatter for this language
+		return text, nil
 	}
 
 	if _, err := exec.LookPath(fmtr.cmd); err != nil {
-		return text, nil // formatter not installed, silently skip
+		if !formatterWarned[lang] {
+			formatterWarned[lang] = true
+			logError(fmt.Errorf("formatter not found: %s", fmtr.cmd), "format-on-save")
+		}
+		return text, nil
 	}
 
-	cmd := exec.Command(fmtr.cmd, fmtr.args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, fmtr.cmd, fmtr.args...)
 	cmd.Stdin = strings.NewReader(text)
 	output, err := cmd.Output()
 	if err != nil {
-		return text, nil // format failed, keep original
+		return text, nil
 	}
 
 	return string(output), nil

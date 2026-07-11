@@ -78,36 +78,18 @@ type Model struct {
 
 	confirmAction ConfirmAction
 
-	// Selection (logical indices)
-	selStart int
-	selEnd   int
+	// State structs
+	search     SearchState
+	palette    PaletteState
+	filePicker FilePickerState
+	selection  SelectionState
+	rename     RenameState
 
-	// Search state
-	searchQuery   string
-	searchMatches []int
-	searchCurrent int
-	replaceQuery  string
-	lastSearch    string
-
-	// Palette state
-	paletteActions []command.Action
-	paletteQuery   string
-	paletteResults []command.Action
-	paletteSel     int
-
-	// File picker state
-	filePickerDir   string
-	filePickerFiles []string
-	filePickerSel   int
-	filePickerQuery string
-	saveAsQuery     string
+	// Save-as query
+	saveAsQuery string
 
 	// Recent files
 	recentFiles []string
-
-	// Rename state
-	renameInput string
-	renameError string
 
 	// Error display
 	errorMessage string
@@ -169,8 +151,7 @@ func New() *Model {
 		mode:             ModeWelcome,
 		language:         "",
 		highlighter:      highlight.NewHighlighter(highlight.ThemeDark),
-		selStart:         -1,
-		selEnd:           -1,
+		selection:        SelectionState{Start: -1, End: -1},
 		statusStyle:      lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252")).Padding(0, 1),
 		statusModified:   lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
 		statusNormal:     lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
@@ -223,7 +204,7 @@ func NewWithFile(path string) (*Model, error) {
 
 // registerActions populates the command palette actions.
 func (m *Model) registerActions() {
-	m.paletteActions = []command.Action{
+	m.palette.Actions = []command.Action{
 		{ID: "file.save", Label: "Save", Shortcut: "Ctrl+S"},
 		{ID: "file.save-as", Label: "Save As", Shortcut: "F3"},
 		{ID: "file.open", Label: "Open File", Shortcut: "Ctrl+O"},
@@ -307,15 +288,17 @@ func (m *Model) Save() {
 	if m.filename == "" {
 		m.filename = "untitled.txt"
 	}
-	if err := fileio.Save(m.filename, m.buf); err == nil {
-		m.modified = false
+	if err := fileio.Save(m.filename, m.buf); err != nil {
+		m.showError(fmt.Sprintf("Save failed: %v", err))
+		return
 	}
+	m.modified = false
 
-	// Format on save
 	if m.config.FormatOnSave {
 		m.applyFormat()
-		// Re-save with formatted content
-		fileio.Save(m.filename, m.buf)
+		if err := fileio.Save(m.filename, m.buf); err != nil {
+			m.showError(fmt.Sprintf("Save after format failed: %v", err))
+		}
 	}
 }
 
@@ -323,7 +306,7 @@ func (m *Model) Save() {
 
 func (m *Model) insertText(text string) {
 	m.undoStack.Push(buffer.Operation{
-		Type: "delete",
+		Type: buffer.OpDelete,
 		Pos:  m.buf.GapPosition(),
 		Text: text,
 	})
@@ -343,7 +326,7 @@ func (m *Model) insertTextAtAllCursors(text string) {
 	for i := len(all) - 1; i >= 0; i-- {
 		m.moveGapTo(all[i].GapPos)
 		m.undoStack.Push(buffer.Operation{
-			Type: "delete",
+			Type: buffer.OpDelete,
 			Pos:  all[i].GapPos,
 			Text: text,
 		})
@@ -360,16 +343,7 @@ func (m *Model) insertTextAtAllCursors(text string) {
 }
 
 func (m *Model) moveGapTo(pos int) {
-	current := m.buf.GapPosition()
-	if pos > current {
-		for i := current; i < pos; i++ {
-			m.buf.MoveGapRight()
-		}
-	} else {
-		for i := current; i > pos; i-- {
-			m.buf.MoveGapLeft()
-		}
-	}
+	m.buf.MoveGapTo(pos)
 }
 
 func (m *Model) syncGapToCursor() {
@@ -541,7 +515,7 @@ func (m *Model) loadRecentFiles() {
 	if err != nil {
 		return
 	}
-	path := filepath.Join(home, ".cmdit", "recent.json")
+	path := filepath.Join(home, ".cmdit", "recent.txt")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -563,9 +537,7 @@ func (m *Model) SaveRecentFiles() {
 	os.WriteFile(path, []byte(strings.Join(m.recentFiles, "\n")), 0600)
 }
 
-func (m *Model) saveRecentFiles() {
-	m.SaveRecentFiles()
-}
+
 
 // validateFileName checks for invalid characters in a file name.
 func validateFileName(name string) error {

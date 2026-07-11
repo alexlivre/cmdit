@@ -1,7 +1,7 @@
 # cmdit — Text editor for humans in the terminal
 
-[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev)
-[![Tests](https://img.shields.io/badge/tests-86%2B%20passing-brightgreen)]()
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev)
+[![Tests](https://img.shields.io/badge/tests-175%2B%20passing-brightgreen)]()
 [![Version](https://img.shields.io/badge/version-v0.4.2-blue)](https://github.com/alexlivre/cmdit/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
@@ -219,16 +219,26 @@ cmdit
 cmdit/
 ├── cmd/cmdit/main.go            # Entry point (SplitContainer → TabManager → editor.Model)
 ├── internal/
-│   ├── buffer/                  # Gap buffer + cursor + undo stack
+│   ├── buffer/                  # Gap buffer + cursor + undo stack + line cache
 │   ├── clipboard/               # Internal clipboard
 │   ├── command/                 # Command palette + action registry
 │   ├── editor/                  # Main Bubble Tea model
 │   │   ├── editor.go            # Model, Init, Update, helpers
-│   │   ├── view.go              # View + rendering
-│   │   ├── keys.go              # Key dispatch + modes
+│   │   ├── state.go             # State structs (Search, Palette, FilePicker, etc.)
+│   │   ├── interfaces.go        # Interfaces (FileLoader, SyntaxHighlighter, etc.)
+│   │   ├── view.go              # Main view + rendering
+│   │   ├── view_welcome.go      # Welcome screen rendering
+│   │   ├── view_palette.go      # Command palette rendering
+│   │   ├── view_filepicker.go   # File picker rendering
+│   │   ├── view_modes.go        # Other mode renderings (save-as, confirm, etc.)
+│   │   ├── keys.go              # Main key dispatch
+│   │   ├── keys_search.go       # Search/replace key handling
+│   │   ├── keys_palette.go      # Command palette key handling
+│   │   ├── keys_filepicker.go   # File picker key handling
+│   │   ├── keys_modes.go        # Other mode key handling
 │   │   ├── actions.go           # Commands (save, undo, clipboard, etc.)
 │   │   └── lsp_integration.go   # LSP integration
-│   ├── fileio/                  # File load/save/rename
+│   ├── fileio/                  # File load/save/rename (with size limits)
 │   ├── highlight/               # Syntax highlighting via Chroma
 │   ├── lsp/                     # LSP client (JSON-RPC 2.0)
 │   ├── renderer/                # Viewport (scroll, resize)
@@ -238,14 +248,14 @@ cmdit/
 ├── bin/                         # Compiled binaries
 ├── go.mod / go.sum              # Go dependencies
 ├── Makefile                     # Build, test, cross-compile
-└── PLANO.md                     # Full development plan
+└── .opencode/plans/             # Implementation plans
 ```
 
 ### Technology stack
 
 | Layer | Technology | Reason |
 |-------|------------|--------|
-| Language | **Go 1.23+** | Single binary, cross-compile, predictable performance |
+| Language | **Go 1.24+** | Single binary, cross-compile, predictable performance |
 | TUI | **Bubble Tea + Lip Gloss** | Elm-like architecture, composable components |
 | Syntax | **Chroma** | 500+ languages, no CGo, fast |
 | Text structure | **Gap Buffer** | O(1) for localized edits, simple |
@@ -268,8 +278,9 @@ go test ./...
 go test ./... -cover
 
 # Current result
-# 86+ tests passing across 6 packages
-# buffer (17) | clipboard (4) | editor (25+) | fileio (4) | renderer (9) | tabs (12)
+# 175+ tests passing across 8 packages
+# buffer (86.5%) | clipboard (100%) | command (100%) | editor (45.5%)
+# fileio (90.9%) | highlight (59.3%) | renderer (84.8%) | tabs (26.2%)
 # go vet ./... ✅ no warnings
 # 5 benchmarks passing
 ```
@@ -311,6 +322,8 @@ make lint
 | 9 | ✅ | Built-in features: auto-close, vim mode, themes, format, keybindings |
 | 10 | ✅ | Quality & stability: errors, security, coverage, benchmarks |
 | 11 | ✅ | Production: installers, quickstart, cheatsheet |
+| 12 | ✅ | Performance optimization: line cache, MoveGapTo O(n), search optimizations |
+| 13 | ✅ | Code quality: state structs, file organization, interfaces, error handling |
 
 ---
 

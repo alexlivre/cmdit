@@ -16,7 +16,7 @@ func TestNewUndoStack(t *testing.T) {
 
 func TestPushAndUndo(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: "insert", Pos: 0, Text: "hello"})
+	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "hello"})
 
 	if !u.CanUndo() {
 		t.Error("should have undo after push")
@@ -26,7 +26,7 @@ func TestPushAndUndo(t *testing.T) {
 	if !ok {
 		t.Error("undo should succeed")
 	}
-	if op.Type != "insert" || op.Text != "hello" {
+	if op.Type != OpInsert || op.Text != "hello" {
 		t.Errorf("unexpected operation: %+v", op)
 	}
 	if u.CanUndo() {
@@ -36,8 +36,8 @@ func TestPushAndUndo(t *testing.T) {
 
 func TestUndoAndRedo(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: "insert", Pos: 0, Text: "a"})
-	u.Push(Operation{Type: "insert", Pos: 1, Text: "b"})
+	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "a"})
+	u.Push(Operation{Type: OpInsert, Pos: 1, Text: "b"})
 
 	// Undo last
 	op, _ := u.Undo()
@@ -68,13 +68,13 @@ func TestUndoAndRedo(t *testing.T) {
 
 func TestPushDiscardsRedoHistory(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: "insert", Pos: 0, Text: "a"})
-	u.Push(Operation{Type: "insert", Pos: 1, Text: "b"})
+	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "a"})
+	u.Push(Operation{Type: OpInsert, Pos: 1, Text: "b"})
 
 	// Undo one
 	u.Undo()
 	// Now push a new operation - should discard 'b' redo
-	u.Push(Operation{Type: "insert", Pos: 1, Text: "c"})
+	u.Push(Operation{Type: OpInsert, Pos: 1, Text: "c"})
 
 	if u.CanRedo() {
 		t.Error("redo history should be discarded after new push")
@@ -88,7 +88,7 @@ func TestPushDiscardsRedoHistory(t *testing.T) {
 
 func TestClear(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: "insert", Pos: 0, Text: "a"})
+	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "a"})
 	u.Clear()
 
 	if u.CanUndo() {
@@ -102,7 +102,7 @@ func TestClear(t *testing.T) {
 func TestMultipleOperations(t *testing.T) {
 	u := NewUndoStack()
 	for i := 0; i < 100; i++ {
-		u.Push(Operation{Type: "insert", Pos: i, Text: "x"})
+		u.Push(Operation{Type: OpInsert, Pos: i, Text: "x"})
 	}
 
 	count := 0

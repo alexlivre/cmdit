@@ -1,8 +1,10 @@
 package editor
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/alexb/cmdit/internal/buffer"
 	"github.com/alexb/cmdit/internal/fileio"
@@ -33,17 +35,17 @@ func (m *Model) executeAction(id string) {
 	case "edit.paste":
 		m.paste()
 	case "edit.select-all":
-		m.selStart = 0
-		m.selEnd = m.buf.Len()
+		m.selection.Start = 0
+		m.selection.End = m.buf.Len()
 	case "search.find":
 		m.mode = ModeSearch
-		m.searchQuery = ""
-		m.searchMatches = nil
+		m.search.Query = ""
+		m.search.Matches = nil
 	case "search.replace":
 		m.mode = ModeReplace
-		m.searchQuery = ""
-		m.replaceQuery = ""
-		m.searchMatches = nil
+		m.search.Query = ""
+		m.search.Replace = ""
+		m.search.Matches = nil
 	case "file.rename":
 		m.enterRename()
 	case "view.toggle-auto-close":
@@ -83,27 +85,28 @@ func (m *Model) save() {
 		m.enterSaveAs()
 		return
 	}
-	if err := fileio.Save(m.filename, m.buf); err == nil {
-		m.modified = false
+	if err := fileio.Save(m.filename, m.buf); err != nil {
+		m.showError(fmt.Sprintf("Save failed: %v", err))
+		return
 	}
+	m.modified = false
 
-	// Format on save
 	if m.config.FormatOnSave {
 		m.applyFormat()
-		// Re-save with formatted content
-		fileio.Save(m.filename, m.buf)
+		if err := fileio.Save(m.filename, m.buf); err != nil {
+			m.showError(fmt.Sprintf("Save after format failed: %v", err))
+		}
 	}
 }
 
 func (m *Model) openFile(path string) {
-	// Sanitize path to prevent traversal
 	path = filepath.Clean(path)
 
-	// Stop any existing LSP
 	m.stopLSP()
 
 	b, err := fileio.Load(path)
 	if err != nil {
+		m.showError(fmt.Sprintf("Failed to open file: %v", err))
 		return
 	}
 	m.buf = b
@@ -129,9 +132,9 @@ func (m *Model) undo() {
 
 	m.moveGapTo(op.Pos)
 	switch op.Type {
-	case "insert":
+	case buffer.OpInsert:
 		m.buf.InsertString(op.Text)
-	case "delete":
+	case buffer.OpDelete:
 		for i := 0; i < len(op.Text); i++ {
 			m.buf.DeleteForward()
 		}
@@ -150,11 +153,11 @@ func (m *Model) redo() {
 
 	m.moveGapTo(op.Pos)
 	switch op.Type {
-	case "insert":
+	case buffer.OpInsert:
 		for i := 0; i < len(op.Text); i++ {
 			m.buf.DeleteForward()
 		}
-	case "delete":
+	case buffer.OpDelete:
 		m.buf.InsertString(op.Text)
 	}
 	m.modified = true
@@ -173,8 +176,8 @@ func (m *Model) copy() {
 		text := m.currentLineText()
 		m.clipboard.Copy(text)
 	}
-	m.selStart = -1
-	m.selEnd = -1
+	m.selection.Start = -1
+	m.selection.End = -1
 }
 
 func (m *Model) cut() {
@@ -196,7 +199,7 @@ func (m *Model) paste() {
 	if m.clipboard.HasText() {
 		text := m.clipboard.Paste()
 		m.undoStack.Push(buffer.Operation{
-			Type: "delete",
+			Type: buffer.OpDelete,
 			Pos:  m.buf.GapPosition(),
 			Text: text,
 		})
@@ -210,28 +213,29 @@ func (m *Model) paste() {
 // --- Selection ---
 
 func (m *Model) hasSelection() bool {
-	return m.selStart >= 0 && m.selEnd >= 0 && m.selStart != m.selEnd
+	return m.selection.Start >= 0 && m.selection.End >= 0 && m.selection.Start != m.selection.End
 }
 
 func (m *Model) getSelectedText() string {
 	if !m.hasSelection() {
 		return ""
 	}
-	start := m.selStart
-	end := m.selEnd
+	start := m.selection.Start
+	end := m.selection.End
 	if start > end {
 		start, end = end, start
 	}
-	var sb string
+	var sb strings.Builder
+	sb.Grow(end - start)
 	for i := start; i < end; i++ {
-		sb += string(m.buf.RuneAt(i))
+		sb.WriteRune(m.buf.RuneAt(i))
 	}
-	return sb
+	return sb.String()
 }
 
 func (m *Model) clearSelection() {
-	m.selStart = -1
-	m.selEnd = -1
+	m.selection.Start = -1
+	m.selection.End = -1
 }
 
 func (m *Model) deleteSelection() {
@@ -240,13 +244,13 @@ func (m *Model) deleteSelection() {
 	}
 	text := m.getSelectedText()
 	m.undoStack.Push(buffer.Operation{
-		Type: "insert",
-		Pos:  m.selStart,
+		Type: buffer.OpInsert,
+		Pos:  m.selection.Start,
 		Text: text,
 	})
 
-	start := m.selStart
-	end := m.selEnd
+	start := m.selection.Start
+	end := m.selection.End
 	if start > end {
 		start, end = end, start
 	}
@@ -255,44 +259,54 @@ func (m *Model) deleteSelection() {
 	for i := 0; i < end-start; i++ {
 		m.buf.DeleteForward()
 	}
-	m.selStart = -1
-	m.selEnd = -1
+	m.selection.Start = -1
+	m.selection.End = -1
 	m.modified = true
 }
 
 // --- Search ---
 
 func (m *Model) doSearch() {
-	if m.searchQuery == "" {
+	if m.search.Query == "" {
+		m.search.Matches = nil
 		return
 	}
-	m.lastSearch = m.searchQuery
+	m.search.Last = m.search.Query
 
 	content := m.buf.String()
-	m.searchMatches = nil
+	contentRunes := []rune(content)
+	queryRunes := []rune(strings.ToLower(m.search.Query))
+	queryLen := len(queryRunes)
 
-	query := strings.ToLower(m.searchQuery)
-	contentLower := strings.ToLower(content)
+	m.search.Matches = nil
+	m.search.Current = 0
 
-	for i := 0; i <= len(content)-len(query); i++ {
-		if contentLower[i:i+len(query)] == query {
-			m.searchMatches = append(m.searchMatches, i)
+	for i := 0; i <= len(contentRunes)-queryLen; i++ {
+		match := true
+		for j := 0; j < queryLen; j++ {
+			if unicode.ToLower(contentRunes[i+j]) != queryRunes[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			byteOffset := len(string(contentRunes[:i]))
+			m.search.Matches = append(m.search.Matches, byteOffset)
 		}
 	}
-	m.searchCurrent = 0
 }
 
 func (m *Model) doReplace() {
-	if len(m.searchMatches) == 0 || m.replaceQuery == "" {
+	if len(m.search.Matches) == 0 || m.search.Replace == "" {
 		return
 	}
 
-	pos := m.searchMatches[m.searchCurrent]
+	pos := m.search.Matches[m.search.Current]
 	m.moveGapTo(pos)
-	for i := 0; i < len(m.searchQuery); i++ {
+	for i := 0; i < len(m.search.Query); i++ {
 		m.buf.DeleteForward()
 	}
-	m.buf.InsertString(m.replaceQuery)
+	m.buf.InsertString(m.search.Replace)
 	m.modified = true
 
 	m.doSearch()
