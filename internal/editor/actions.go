@@ -3,6 +3,8 @@ package editor
 import (
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/alexb/cmdit/internal/buffer"
 	"github.com/alexb/cmdit/internal/fileio"
@@ -201,7 +203,7 @@ func (m *Model) paste() {
 			Text: text,
 		})
 		m.buf.InsertString(text)
-		m.cursor.Col += len(text)
+		m.cursor.Col += utf8.RuneCountInString(text)
 		m.modified = true
 		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 	}
@@ -268,14 +270,21 @@ func (m *Model) doSearch() {
 	}
 	m.lastSearch = m.searchQuery
 
-	content := m.buf.String()
+	// Search in rune-space so match indices are logical rune indices
+	// (RuneAt/navigation work in runes, not bytes).
+	contentRunes := []rune(m.buf.String())
+	queryRunes := []rune(strings.ToLower(m.searchQuery))
+
 	m.searchMatches = nil
-
-	query := strings.ToLower(m.searchQuery)
-	contentLower := strings.ToLower(content)
-
-	for i := 0; i <= len(content)-len(query); i++ {
-		if contentLower[i:i+len(query)] == query {
+	for i := 0; i+len(queryRunes) <= len(contentRunes); i++ {
+		match := true
+		for j := 0; j < len(queryRunes); j++ {
+			if unicode.ToLower(contentRunes[i+j]) != queryRunes[j] {
+				match = false
+				break
+			}
+		}
+		if match {
 			m.searchMatches = append(m.searchMatches, i)
 		}
 	}
@@ -289,7 +298,7 @@ func (m *Model) doReplace() {
 
 	pos := m.searchMatches[m.searchCurrent]
 	m.moveGapTo(pos)
-	for i := 0; i < len(m.searchQuery); i++ {
+	for i := 0; i < utf8.RuneCountInString(m.searchQuery); i++ {
 		m.buf.DeleteForward()
 	}
 	m.buf.InsertString(m.replaceQuery)

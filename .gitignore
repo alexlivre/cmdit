@@ -45,4 +45,8 @@ temp/
 
 # Qwen local config
 .qwen/
-".playwright-mcp/"  
+".playwright-mcp/"
+
+# Build artifacts / cache
+.codegraph/
+coverage  

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -350,10 +351,11 @@ func (m *Model) insertTextAtAllCursors(text string) {
 		m.buf.InsertString(text)
 	}
 
-	// Update cursor and extra cursors
-	m.cursor.Col += len(text)
+	// Update cursor and extra cursors (rune count, not byte length)
+	delta := utf8.RuneCountInString(text)
+	m.cursor.Col += delta
 	for i := range m.extraCursors {
-		m.extraCursors[i].Col += len(text)
+		m.extraCursors[i].Col += delta
 	}
 	m.modified = true
 	m.sendDidChange()
@@ -470,19 +472,20 @@ func (m *Model) moveCursorRight() {
 
 func (m *Model) moveCursorWordLeft() {
 	lineText := m.currentLineText()
+	runes := []rune(lineText)
 	if m.cursor.Col == 0 {
 		if m.cursor.Line > 0 {
 			m.cursor.Line--
 			prevLineText := m.lineText(m.cursor.Line)
-			m.cursor.Col = len(prevLineText)
+			m.cursor.Col = utf8.RuneCountInString(prevLineText)
 		}
 		m.syncGapToCursor()
 		return
 	}
-	for m.cursor.Col > 0 && isSpace(rune(lineText[m.cursor.Col-1])) {
+	for m.cursor.Col > 0 && isSpace(runes[m.cursor.Col-1]) {
 		m.cursor.Col--
 	}
-	for m.cursor.Col > 0 && !isSpace(rune(lineText[m.cursor.Col-1])) {
+	for m.cursor.Col > 0 && !isSpace(runes[m.cursor.Col-1]) {
 		m.cursor.Col--
 	}
 	m.syncGapToCursor()
@@ -490,7 +493,8 @@ func (m *Model) moveCursorWordLeft() {
 
 func (m *Model) moveCursorWordRight() {
 	lineText := m.currentLineText()
-	if m.cursor.Col >= len(lineText) {
+	runes := []rune(lineText)
+	if m.cursor.Col >= len(runes) {
 		if m.cursor.Line < m.buf.LineCount()-1 {
 			m.cursor.Line++
 			m.cursor.Col = 0
@@ -498,10 +502,10 @@ func (m *Model) moveCursorWordRight() {
 		m.syncGapToCursor()
 		return
 	}
-	for m.cursor.Col < len(lineText) && !isSpace(rune(lineText[m.cursor.Col])) {
+	for m.cursor.Col < len(runes) && !isSpace(runes[m.cursor.Col]) {
 		m.cursor.Col++
 	}
-	for m.cursor.Col < len(lineText) && isSpace(rune(lineText[m.cursor.Col])) {
+	for m.cursor.Col < len(runes) && isSpace(runes[m.cursor.Col]) {
 		m.cursor.Col++
 	}
 	m.syncGapToCursor()
@@ -600,19 +604,26 @@ func (m *Model) wordAtCursor() string {
 		return ""
 	}
 
-	start := m.cursor.Col
-	for start > 0 && isWordChar(rune(line[start-1])) {
+	// Operate in rune-space so multibyte sequences are not split.
+	runes := []rune(line)
+	col := m.cursor.Col
+	if col > len(runes) {
+		col = len(runes)
+	}
+
+	start := col
+	for start > 0 && isWordChar(runes[start-1]) {
 		start--
 	}
-	end := m.cursor.Col
-	for end < len(line) && isWordChar(rune(line[end])) {
+	end := col
+	for end < len(runes) && isWordChar(runes[end]) {
 		end++
 	}
 
 	if start == end {
 		return ""
 	}
-	return line[start:end]
+	return string(runes[start:end])
 }
 
 func isWordChar(r rune) bool {

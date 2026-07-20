@@ -154,12 +154,24 @@ func TestVimModeDeleteChar(t *testing.T) {
 	for _, r := range "abc" {
 		m.handleKey(keyRune(r))
 	}
+	// After typing "abc" in insert mode, cursor sits at col 3 (after 'c').
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	// Vim Esc retracts cursor one column: now over 'c' at col 2.
+	if m.cursor.Col != 2 {
+		t.Fatalf("expected cursor col 2 after Esc (Vim retract), got %d", m.cursor.Col)
+	}
 
-	// Cursor is at col 0. Move right to be over 'b' (col 1).
+	// Move right once to be at end (col 3); from col 2, 'l' goes to col 3.
 	m.handleKey(keyRune('l'))
+	if m.cursor.Col != 3 {
+		t.Fatalf("expected cursor col 3 after 'l', got %d", m.cursor.Col)
+	}
+
+	// Move back two to be over 'b' (col 1), then 'x' deletes 'b'.
+	m.handleKey(keyRune('h'))
+	m.handleKey(keyRune('h'))
 	if m.cursor.Col != 1 {
-		t.Fatalf("expected cursor col 1 after 'l', got %d", m.cursor.Col)
+		t.Fatalf("expected cursor col 1 over 'b', got %d", m.cursor.Col)
 	}
 
 	// Press 'x' to delete character under cursor ('b')
@@ -275,8 +287,9 @@ func TestVimModeUndoDeleteChar(t *testing.T) {
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
 
-	// Move to col 1 (position on 'b')
-	m.handleKey(keyRune('l'))
+	// After Esc, cursor sits over 'f' (col 5). Go to col 0 then over 'b' (col 1).
+	m.handleKey(keyRune('0')) // col 0
+	m.handleKey(keyRune('l')) // col 1
 	if m.cursor.Col != 1 {
 		t.Fatalf("expected cursor col 1, got %d", m.cursor.Col)
 	}

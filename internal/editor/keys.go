@@ -24,6 +24,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc":
 				m.vimState.Mode = VimNormal
+				// Vim: leaving insert mode moves the cursor one column left
+				// (where the last typed rune sits), unless already at col 0.
+				if m.cursor.Col > 0 {
+					m.cursor.Col--
+					m.syncGapToCursor()
+				}
 				return m, nil
 			}
 			// Fall through to normal key handling for insert mode typing.
@@ -279,6 +285,17 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Normal insert
 			text := string(msg.Runes)
 			m.insertTextAtAllCursors(text)
+			if len(m.extraCursors) == 0 {
+				// Advance the primary cursor through inserted runes.
+				for _, r := range text {
+					if r == '\n' {
+						m.cursor.Line++
+						m.cursor.Col = 0
+					} else {
+						m.cursor.Col++
+					}
+				}
+			}
 			m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 		}
 		return m, nil
