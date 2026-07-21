@@ -309,8 +309,8 @@ func (m *Model) handleBackspace() (tea.Model, tea.Cmd) {
 	}
 
 	if len(m.extraCursors) > 0 {
-		// Delete at all cursor positions (end to start)
 		all := m.allCursors()
+		primaryDeleted := false
 		for i := len(all) - 1; i >= 0; i-- {
 			c := all[i]
 			if c.GapPos == 0 {
@@ -324,16 +324,22 @@ func (m *Model) handleBackspace() (tea.Model, tea.Cmd) {
 			})
 			m.moveGapTo(c.GapPos)
 			m.buf.Backspace()
+			if i == 0 {
+				primaryDeleted = true
+			}
 		}
-		// Restore primary cursor position
-		m.cursor.Col--
-		if m.cursor.Col < 0 {
-			m.cursor.Col = 0
+		if primaryDeleted {
+			m.cursor.Col--
+			if m.cursor.Col < 0 {
+				m.cursor.Col = 0
+			}
 		}
 		for i := range m.extraCursors {
-			m.extraCursors[i].Col--
-			if m.extraCursors[i].Col < 0 {
-				m.extraCursors[i].Col = 0
+			if all[i+1].GapPos > 0 {
+				m.extraCursors[i].Col--
+				if m.extraCursors[i].Col < 0 {
+					m.extraCursors[i].Col = 0
+				}
 			}
 		}
 		m.modified = true

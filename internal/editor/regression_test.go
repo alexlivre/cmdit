@@ -218,3 +218,53 @@ func TestCutLineUndo(t *testing.T) {
 		t.Errorf("expected original content after undo, got %q", m.buf.String())
 	}
 }
+
+func TestAddNextOccurrenceCorrectPosition(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("foo bar foo")
+	m.cursor.SetPos(0, 0)
+	m.syncGapToCursor()
+
+	m.addNextOccurrence()
+
+	if len(m.extraCursors) != 1 {
+		t.Fatalf("expected 1 extra cursor, got %d", len(m.extraCursors))
+	}
+	if m.extraCursors[0].GapPos != 8 {
+		t.Errorf("expected second occurrence at pos 8, got %d", m.extraCursors[0].GapPos)
+	}
+}
+
+func TestAddNextOccurrenceWrapAround(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("foo bar foo")
+	m.cursor.SetPos(0, 8)
+	m.syncGapToCursor()
+
+	m.addNextOccurrence()
+
+	if len(m.extraCursors) != 1 {
+		t.Fatalf("expected 1 extra cursor via wrap-around, got %d", len(m.extraCursors))
+	}
+	if m.extraCursors[0].GapPos != 0 {
+		t.Errorf("expected wrap-around to pos 0, got %d", m.extraCursors[0].GapPos)
+	}
+}
+
+func TestBackspaceMultiCursorColClamp(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("abc")
+	m.cursor.SetPos(0, 3)
+	m.syncGapToCursor()
+
+	for i := 0; i < 3; i++ {
+		m.handleBackspace()
+	}
+
+	if m.cursor.Col != 0 {
+		t.Errorf("expected Col 0 after 3 backspaces, got %d", m.cursor.Col)
+	}
+}

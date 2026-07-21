@@ -637,14 +637,12 @@ func (m *Model) addNextOccurrence() {
 		return
 	}
 
-	// Build list of existing positions (primary + extras)
 	existing := make(map[int]bool)
 	existing[m.buf.GapPosition()] = true
 	for _, c := range m.extraCursors {
 		existing[c.GapPos] = true
 	}
 
-	// Start search from after the last cursor position
 	lastPos := m.buf.GapPosition()
 	for _, c := range m.extraCursors {
 		if c.GapPos > lastPos {
@@ -653,45 +651,29 @@ func (m *Model) addNextOccurrence() {
 	}
 
 	content := m.buf.String()
+	if lastPos+1 >= len(content) {
+		return
+	}
 	searchStart := lastPos + 1
 
 	idx := strings.Index(content[searchStart:], word)
-	if idx == -1 {
-		// Wrap around: search from beginning
+	if idx >= 0 {
+		idx += searchStart
+	} else {
 		idx = strings.Index(content, word)
 	}
-	if idx == -1 {
+	if idx < 0 || idx >= len(content) {
+		return
+	}
+	if existing[idx] {
 		return
 	}
 
-	// Calculate actual position
-	actualPos := idx
-	if actualPos < len(content) && actualPos >= searchStart {
-		// already correct
-	} else if idx >= 0 && idx < searchStart-lastPos+searchStart {
-		actualPos = idx
-	} else {
-		actualPos = searchStart + idx
-	}
-
-	// Clamp
-	if actualPos >= len(content) {
-		actualPos = idx
-	}
-	if actualPos >= len(content) {
-		return
-	}
-
-	// Don't add duplicates
-	if existing[actualPos] {
-		return
-	}
-
-	line, col := m.buf.LineCol(actualPos)
+	line, col := m.buf.LineCol(idx)
 	m.extraCursors = append(m.extraCursors, EditorCursor{
 		Line:   line,
 		Col:    col,
-		GapPos: actualPos,
+		GapPos: idx,
 	})
 }
 
