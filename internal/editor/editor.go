@@ -340,18 +340,18 @@ func (m *Model) insertTextAtAllCursors(text string) {
 	}
 
 	all := m.allCursors()
-	// Process from end to start to preserve positions
+	var ops []buffer.Operation
 	for i := len(all) - 1; i >= 0; i-- {
 		m.moveGapTo(all[i].GapPos)
-		m.undoStack.Push(buffer.Operation{
+		ops = append(ops, buffer.Operation{
 			Type: "delete",
 			Pos:  all[i].GapPos,
 			Text: text,
 		})
 		m.buf.InsertString(text)
 	}
+	m.undoStack.PushComposite(ops)
 
-	// Update cursor and extra cursors (rune count, not byte length)
 	delta := utf8.RuneCountInString(text)
 	m.cursor.Col += delta
 	for i := range m.extraCursors {

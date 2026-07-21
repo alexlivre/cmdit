@@ -3,6 +3,7 @@ package editor
 import (
 	"testing"
 
+	"github.com/alexb/cmdit/internal/buffer"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -150,5 +151,70 @@ func TestWordAtCursorMultibyte(t *testing.T) {
 	w := m.wordAtCursor()
 	if w != "world" {
 		t.Errorf("wordAtCursor multibyte: got %q, want \"world\"", w)
+	}
+}
+
+func TestMultiCursorUndoAtomico(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("aaa bbb ccc")
+	m.cursor.SetPos(0, 0)
+	m.syncGapToCursor()
+
+	m.extraCursors = []EditorCursor{
+		{Line: 0, Col: 4, GapPos: 4},
+		{Line: 0, Col: 8, GapPos: 8},
+	}
+
+	m.insertTextAtAllCursors("x")
+
+	content := m.buf.String()
+	if len(content) != 14 {
+		t.Fatalf("expected length 14 after 3 inserts, got %d: %q", len(content), content)
+	}
+
+	m.undo()
+	contentAfterUndo := m.buf.String()
+	if contentAfterUndo != "aaa bbb ccc" {
+		t.Errorf("expected 'aaa bbb ccc' after undo, got %q", contentAfterUndo)
+	}
+}
+
+func TestReplaceUndo(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("hello world")
+	m.searchQuery = "world"
+	m.replaceQuery = "golang"
+	m.doSearch()
+	m.doReplace()
+
+	if m.buf.String() != "hello golang" {
+		t.Fatalf("expected 'hello golang', got %q", m.buf.String())
+	}
+
+	m.undo()
+	if m.buf.String() != "hello world" {
+		t.Errorf("expected 'hello world' after undo, got %q", m.buf.String())
+	}
+}
+
+func TestCutLineUndo(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("line one\nline two\n")
+	m.cursor.SetPos(1, 0)
+	m.syncGapToCursor()
+
+	m.cut()
+
+	content := m.buf.String()
+	if content != "line one\n" {
+		t.Fatalf("expected 'line one\\n' after cut, got %q", content)
+	}
+
+	m.undo()
+	if m.buf.String() != "line one\nline two\n" {
+		t.Errorf("expected original content after undo, got %q", m.buf.String())
 	}
 }

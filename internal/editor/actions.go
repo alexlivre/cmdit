@@ -124,18 +124,19 @@ func (m *Model) openFile(path string) {
 // --- Undo/Redo ---
 
 func (m *Model) undo() {
-	op, ok := m.undoStack.Undo()
+	ops, ok := m.undoStack.Undo()
 	if !ok {
 		return
 	}
-
-	m.moveGapTo(op.Pos)
-	switch op.Type {
-	case "insert":
-		m.buf.InsertString(op.Text)
-	case "delete":
-		for i := 0; i < len(op.Text); i++ {
-			m.buf.DeleteForward()
+	for _, op := range ops {
+		m.moveGapTo(op.Pos)
+		switch op.Type {
+		case "insert":
+			m.buf.InsertString(op.Text)
+		case "delete":
+			for i := 0; i < len(op.Text); i++ {
+				m.buf.DeleteForward()
+			}
 		}
 	}
 	m.modified = true
@@ -145,19 +146,20 @@ func (m *Model) undo() {
 }
 
 func (m *Model) redo() {
-	op, ok := m.undoStack.Redo()
+	ops, ok := m.undoStack.Redo()
 	if !ok {
 		return
 	}
-
-	m.moveGapTo(op.Pos)
-	switch op.Type {
-	case "insert":
-		for i := 0; i < len(op.Text); i++ {
-			m.buf.DeleteForward()
+	for _, op := range ops {
+		m.moveGapTo(op.Pos)
+		switch op.Type {
+		case "insert":
+			for i := 0; i < len(op.Text); i++ {
+				m.buf.DeleteForward()
+			}
+		case "delete":
+			m.buf.InsertString(op.Text)
 		}
-	case "delete":
-		m.buf.InsertString(op.Text)
 	}
 	m.modified = true
 	m.cursor.Line, m.cursor.Col = m.buf.LineCol(m.buf.GapPosition())
@@ -185,9 +187,19 @@ func (m *Model) cut() {
 		m.deleteSelection()
 	} else {
 		m.clipboard.Copy(m.currentLineText())
-		m.moveGapTo(m.buf.LineStart(m.cursor.Line))
+		lineStart := m.buf.LineStart(m.cursor.Line)
 		lineEnd := m.buf.LineStart(m.cursor.Line + 1)
-		for i := m.buf.LineStart(m.cursor.Line); i < lineEnd && m.buf.GapPosition() < m.buf.Len(); i++ {
+		var sb strings.Builder
+		for i := lineStart; i < lineEnd && i < m.buf.Len(); i++ {
+			sb.WriteRune(m.buf.RuneAt(i))
+		}
+		m.undoStack.Push(buffer.Operation{
+			Type: "insert",
+			Pos:  lineStart,
+			Text: sb.String(),
+		})
+		m.moveGapTo(lineStart)
+		for i := lineStart; i < lineEnd && m.buf.GapPosition() < m.buf.Len(); i++ {
 			m.buf.DeleteForward()
 		}
 		m.modified = true
@@ -297,6 +309,10 @@ func (m *Model) doReplace() {
 	}
 
 	pos := m.searchMatches[m.searchCurrent]
+	m.undoStack.PushComposite([]buffer.Operation{
+		{Type: "insert", Pos: pos, Text: m.searchQuery},
+		{Type: "delete", Pos: pos, Text: m.replaceQuery},
+	})
 	m.moveGapTo(pos)
 	for i := 0; i < utf8.RuneCountInString(m.searchQuery); i++ {
 		m.buf.DeleteForward()
