@@ -236,3 +236,45 @@ func TestLineColNegative(t *testing.T) {
 		t.Errorf("LineCol(-1) = (%d,%d), expected (0,0)", line, col)
 	}
 }
+
+func TestMoveGapLeftReturnsCorrectRune(t *testing.T) {
+	b := NewBufferFromString("ab")
+	b.MoveGapRight()
+	b.MoveGapRight()
+
+	r := b.MoveGapLeft()
+	if r != 'b' {
+		t.Errorf("expected 'b', got %q", r)
+	}
+}
+
+func TestBackspaceThenMoveGapLeftNoGarbage(t *testing.T) {
+	b := NewBufferFromString("abc")
+
+	b.MoveGapRight()
+	b.MoveGapRight()
+	b.MoveGapRight()
+
+	b.Backspace()
+
+	b.MoveGapLeft()
+	b.MoveGapLeft()
+
+	s := b.String()
+	if s != "ab" {
+		t.Errorf("expected 'ab', got %q", s)
+	}
+}
+
+func TestBackspaceAtZero(t *testing.T) {
+	b := NewBufferFromString("abc")
+	// gap is at position 3 after insertion; backspace 3 times
+	b.Backspace()
+	b.Backspace()
+	b.Backspace()
+	// 4th backspace at position 0 should fail
+	ok := b.Backspace()
+	if ok {
+		t.Error("Backspace at position 0 should return false")
+	}
+}

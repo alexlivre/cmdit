@@ -62,6 +62,7 @@ func (b *Buffer) Backspace() bool {
 		return false
 	}
 	b.gapStart--
+	b.data[b.gapStart] = 0
 	b.length--
 	return true
 }
@@ -92,8 +93,9 @@ func (b *Buffer) MoveGapLeft() rune {
 	}
 	b.gapStart--
 	b.gapEnd--
-	b.data[b.gapEnd] = b.data[b.gapStart]
-	return b.data[b.gapStart]
+	ch := b.data[b.gapStart]
+	b.data[b.gapEnd] = ch
+	return ch
 }
 
 // MoveGapRight moves the gap one position to the right.
