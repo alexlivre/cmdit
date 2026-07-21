@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/alexb/cmdit/internal/buffer"
 )
 
 func TestFormatOnSaveToggle(t *testing.T) {
@@ -53,5 +55,23 @@ func TestFormatGoFile(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if string(data) == code {
 		t.Error("file should be formatted")
+	}
+}
+
+func TestFormatResetsUndo(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.language = "Go"
+	m.buf = buffer.NewBufferFromString("package main\nfunc main(){}\n")
+	m.undoStack.Push(buffer.Operation{Type: "insert", Pos: 0, Text: "test"})
+
+	if !m.undoStack.CanUndo() {
+		t.Fatal("should have undo before format")
+	}
+
+	m.applyFormat()
+
+	if m.undoStack.CanUndo() {
+		t.Error("undo stack should be cleared after format")
 	}
 }

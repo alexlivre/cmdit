@@ -1,6 +1,7 @@
 package editor
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -52,12 +53,15 @@ func (m *Model) executeAction(id string) {
 		m.enterGoToLine()
 	case "view.toggle-auto-close":
 		m.config.AutoCloseEnabled = !m.config.AutoCloseEnabled
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-auto-close")
+		}
 	case "view.toggle-vim-mode":
 		m.config.VimMode = !m.config.VimMode
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-vim-mode")
+		}
 	case "view.next-theme":
-		// Cycle through themes
 		themes := []string{"dark", "light", "monokai", "dracula", "solarized-dark"}
 		current := m.config.Theme
 		for i, t := range themes {
@@ -67,16 +71,24 @@ func (m *Model) executeAction(id string) {
 			}
 		}
 		m.highlighter.SetTheme(m.config.Theme)
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config next-theme")
+		}
 	case "view.toggle-word-wrap":
 		m.config.WordWrap = !m.config.WordWrap
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-word-wrap")
+		}
 	case "file.toggle-format-on-save":
 		m.config.FormatOnSave = !m.config.FormatOnSave
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-format-on-save")
+		}
 	case "file.toggle-auto-save":
 		m.config.AutoSaveEnabled = !m.config.AutoSaveEnabled
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-auto-save")
+		}
 	}
 }
 
@@ -87,15 +99,17 @@ func (m *Model) save() {
 		m.enterSaveAs()
 		return
 	}
-	if err := fileio.Save(m.filename, m.buf); err == nil {
-		m.modified = false
+	if err := fileio.Save(m.filename, m.buf); err != nil {
+		m.showError(fmt.Sprintf("Save error: %v", err))
+		return
 	}
+	m.modified = false
 
-	// Format on save
 	if m.config.FormatOnSave {
 		m.applyFormat()
-		// Re-save with formatted content
-		fileio.Save(m.filename, m.buf)
+		if err := fileio.Save(m.filename, m.buf); err != nil {
+			m.showError(fmt.Sprintf("Format save error: %v", err))
+		}
 	}
 }
 
@@ -238,11 +252,12 @@ func (m *Model) getSelectedText() string {
 	if start > end {
 		start, end = end, start
 	}
-	var sb string
+	var sb strings.Builder
+	sb.Grow(end - start)
 	for i := start; i < end; i++ {
-		sb += string(m.buf.RuneAt(i))
+		sb.WriteRune(m.buf.RuneAt(i))
 	}
-	return sb
+	return sb.String()
 }
 
 func (m *Model) clearSelection() {

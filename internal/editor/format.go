@@ -48,13 +48,14 @@ func (m *Model) formatBuffer() (string, error) {
 func (m *Model) applyFormat() error {
 	formatted, err := m.formatBuffer()
 	if err != nil || formatted == m.buf.String() {
-		return nil // nothing to do
+		return nil
 	}
+
+	m.undoStack.Clear()
 
 	cursorPos := m.buf.GapPosition()
 	m.buf = buffer.NewBufferFromString(formatted)
 
-	// Restore cursor approximately
 	if cursorPos < m.buf.Len() {
 		m.moveGapTo(cursorPos)
 	} else {

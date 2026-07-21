@@ -84,14 +84,10 @@ func (m *Model) renderContent() string {
 					prefix = strings.Repeat(" ", lineNumWidth+1)
 				}
 
-				// Apply syntax highlighting
-				segments := m.highlighter.HighlightLine(wl, m.language)
+				lineWithGuides := m.applyIndentGuides(wl, wl)
+				segments := m.highlighter.HighlightLine(lineWithGuides, m.language)
 				lineText := highlight.RenderSegments(segments)
 
-				// Apply indent guides
-				lineText = m.applyIndentGuides(lineText, wl)
-
-				// Apply search highlighting on top
 				if len(m.searchMatches) > 0 {
 					lineText = m.applySearchHighlight(lineText, i)
 				}
@@ -109,14 +105,11 @@ func (m *Model) renderContent() string {
 			lineNum := fmt.Sprintf("%*d ", lineNumWidth, i+1)
 			styledLineNum := m.lineNumStyle.Render(lineNum)
 
-			// Apply syntax highlighting
-			segments := m.highlighter.HighlightLine(lines[i], m.language)
+			rawLine := lines[i]
+			lineWithGuides := m.applyIndentGuides(rawLine, rawLine)
+			segments := m.highlighter.HighlightLine(lineWithGuides, m.language)
 			lineText := highlight.RenderSegments(segments)
 
-			// Apply indent guides
-			lineText = m.applyIndentGuides(lineText, lines[i])
-
-			// Apply search highlighting on top
 			if len(m.searchMatches) > 0 {
 				lineText = m.applySearchHighlight(lineText, i)
 			}
@@ -144,12 +137,10 @@ func (m *Model) renderContent() string {
 
 // applyIndentGuides draws subtle vertical lines at each indent level.
 func (m *Model) applyIndentGuides(lineText string, rawLine string) string {
-	// Only show guides on lines with content
 	if strings.TrimSpace(rawLine) == "" {
 		return lineText
 	}
 
-	// Count leading whitespace
 	indent := 0
 	for _, r := range rawLine {
 		if r == ' ' {
@@ -161,39 +152,20 @@ func (m *Model) applyIndentGuides(lineText string, rawLine string) string {
 		}
 	}
 
-	// Draw guide at each 4-space boundary
-	tabWidth := 4
-	var result []rune
-	runes := []rune(lineText)
-	col := 0
-
-	for _, r := range runes {
-		if col > 0 && col < indent && col%tabWidth == 0 {
-			result = append(result, []rune(m.indentGuideStyle.Render("│"))...)
-			// Skip the actual space character, replace with guide
-			// But we need to handle this carefully — the guide replaces the space
-		} else {
-			result = append(result, r)
-		}
-		col++
-	}
-
-	// Simpler approach: overlay guides on the raw line
-	// Actually let me use a simpler approach — build from scratch
-	if indent < tabWidth {
+	if indent < 4 {
 		return lineText
 	}
 
+	runes := []rune(lineText)
 	var b strings.Builder
-	runes2 := []rune(lineText)
-	for i, r := range runes2 {
-		if i > 0 && i < indent && i%tabWidth == 0 {
-			b.WriteString(m.indentGuideStyle.Render("│"))
+	b.Grow(len(runes) + indent/4*3)
+	for i, r := range runes {
+		if i > 0 && i < indent && i%4 == 0 {
+			b.WriteString("│")
 		} else {
 			b.WriteRune(r)
 		}
 	}
-
 	return b.String()
 }
 
