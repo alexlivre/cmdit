@@ -3,6 +3,7 @@ package lsp
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // --- JSON-RPC 2.0 Types ---
@@ -208,29 +210,37 @@ type Client struct {
 	requestID int
 	mu        sync.Mutex
 
-	// Message handlers
+	ctx    context.Context
+	cancel context.CancelFunc
+	done   chan struct{}
+
 	onDiagnostics func(uri string, diagnostics []Diagnostic)
 	onCompletion  func(id int, items []CompletionItem)
 
-	// Pending responses
 	pending map[int]chan Response
 }
 
 // NewClient creates a new LSP client and starts the server.
 // serverCmd is the command to run (e.g., "gopls").
 func NewClient(serverCmd string, args ...string) (*Client, error) {
+	ctx, cancel := context.WithCancel(context.Background())
 	c := &Client{
 		requestID: 1,
 		pending:   make(map[int]chan Response),
+		ctx:       ctx,
+		cancel:    cancel,
+		done:      make(chan struct{}),
 	}
 
 	cmd := exec.Command(serverCmd, args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("lsp stdin: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("lsp stdout: %w", err)
 	}
 
@@ -240,10 +250,10 @@ func NewClient(serverCmd string, args ...string) (*Client, error) {
 	c.reader = bufio.NewReader(stdout)
 
 	if err := cmd.Start(); err != nil {
+		cancel()
 		return nil, fmt.Errorf("lsp start: %w", err)
 	}
 
-	// Start reading responses in background
 	go c.readLoop()
 
 	return c, nil
@@ -328,6 +338,8 @@ func (c *Client) OnCompletion(handler func(id int, items []CompletionItem)) {
 func (c *Client) Shutdown() error {
 	c.request("shutdown", nil)
 	c.notify("exit", nil)
+	c.cancel()
+	<-c.done
 	return c.cmd.Wait()
 }
 
@@ -355,12 +367,23 @@ func (c *Client) request(method string, params interface{}) (Response, error) {
 		return Response{}, err
 	}
 
-	// Wait for response
-	resp := <-ch
-	if resp.Error != nil {
-		return resp, fmt.Errorf("lsp error %d: %s", resp.Error.Code, resp.Error.Message)
+	select {
+	case resp := <-ch:
+		if resp.Error != nil {
+			return resp, fmt.Errorf("lsp error %d: %s", resp.Error.Code, resp.Error.Message)
+		}
+		return resp, nil
+	case <-time.After(10 * time.Second):
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
+		return Response{}, fmt.Errorf("lsp request timeout: %s", method)
+	case <-c.ctx.Done():
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
+		return Response{}, fmt.Errorf("lsp client shutdown")
 	}
-	return resp, nil
 }
 
 func (c *Client) notify(method string, params interface{}) error {
@@ -390,21 +413,24 @@ func (c *Client) writeMessage(msg interface{}) error {
 
 // readLoop continuously reads messages from the server.
 func (c *Client) readLoop() {
+	defer close(c.done)
 	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+		}
 		msg, err := c.readMessage()
 		if err != nil {
-			// Server likely terminated
 			return
 		}
 
-		// Try parsing as a notification first
 		var notif Notification
 		if err := json.Unmarshal(msg, &notif); err == nil && notif.Method != "" {
 			c.handleNotification(notif)
 			continue
 		}
 
-		// Try parsing as a response
 		var resp Response
 		if err := json.Unmarshal(msg, &resp); err == nil {
 			c.handleResponse(resp)

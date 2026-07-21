@@ -237,30 +237,23 @@ func (m *Model) renderStatus() string {
 	diagInfo := ""
 	if m.lspClient != nil {
 		m.lspDiagnosticsMu.Lock()
-		totalDiags := 0
+		errCount, warnCount := 0, 0
 		for _, diags := range m.diagnostics {
-			totalDiags += len(diags)
+			for _, d := range diags {
+				if d.Severity == 1 {
+					errCount++
+				} else if d.Severity == 2 {
+					warnCount++
+				}
+			}
 		}
 		m.lspDiagnosticsMu.Unlock()
 
-		if totalDiags > 0 {
-			errCount := 0
-			warnCount := 0
-			for _, diags := range m.diagnostics {
-				for _, d := range diags {
-					if d.Severity == 1 {
-						errCount++
-					} else if d.Severity == 2 {
-						warnCount++
-					}
-				}
-			}
-			if errCount > 0 {
-				diagInfo += fmt.Sprintf(" ✗%d", errCount)
-			}
-			if warnCount > 0 {
-				diagInfo += fmt.Sprintf(" ⚠%d", warnCount)
-			}
+		if errCount > 0 {
+			diagInfo += fmt.Sprintf(" E:%d", errCount)
+		}
+		if warnCount > 0 {
+			diagInfo += fmt.Sprintf(" W:%d", warnCount)
 		}
 	}
 
