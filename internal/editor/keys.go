@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -63,6 +64,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.mode == ModeRename {
 		return m.handleRenameKey(msg)
+	}
+	if m.mode == ModeGoToLine {
+		return m.handleGoToLineKey(msg)
 	}
 	if m.mode == ModeSearch || m.mode == ModeReplace {
 		return m.handleSearchKey(msg)
@@ -731,6 +735,43 @@ func (m *Model) confirmRename() (tea.Model, tea.Cmd) {
 	m.mode = ModeNormal
 	m.renameError = ""
 	m.addRecentFile(newPath)
+	return m, nil
+}
+
+func (m *Model) enterGoToLine() {
+	m.mode = ModeGoToLine
+	m.goToLineInput = ""
+}
+
+func (m *Model) handleGoToLineKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = ModeNormal
+		return m, nil
+	case "enter":
+		if m.goToLineInput == "" {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		num, err := strconv.Atoi(m.goToLineInput)
+		if err != nil || num < 1 || num > m.buf.LineCount() {
+			return m, m.showError("Invalid line number")
+		}
+		m.cursor.SetPos(num-1, 0)
+		m.clampCursor()
+		m.syncGapToCursor()
+		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
+		m.mode = ModeNormal
+		return m, nil
+	case "backspace":
+		if len(m.goToLineInput) > 0 {
+			m.goToLineInput = m.goToLineInput[:len(m.goToLineInput)-1]
+		}
+	default:
+		if len(msg.Runes) > 0 && msg.Runes[0] >= '0' && msg.Runes[0] <= '9' {
+			m.goToLineInput += string(msg.Runes)
+		}
+	}
 	return m, nil
 }
 

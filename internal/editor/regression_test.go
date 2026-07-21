@@ -268,3 +268,39 @@ func TestBackspaceMultiCursorColClamp(t *testing.T) {
 		t.Errorf("expected Col 0 after 3 backspaces, got %d", m.cursor.Col)
 	}
 }
+
+func TestSearchHighlightUnicode(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("cafe com leite")
+	m.searchQuery = "cafe"
+	m.doSearch()
+
+	if len(m.searchMatches) != 1 {
+		t.Fatalf("expected 1 match for 'cafe', got %d", len(m.searchMatches))
+	}
+}
+
+func TestGoToLine(t *testing.T) {
+	m := New()
+	m.mode = ModeNormal
+	m.buf = buffer.NewBufferFromString("line1\nline2\nline3\nline4\nline5")
+	m.goToLineInput = "3"
+	m.handleGoToLineKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.cursor.Line != 2 {
+		t.Errorf("expected line 2 (0-indexed), got %d", m.cursor.Line)
+	}
+}
+
+func TestGoToLineOutOfRange(t *testing.T) {
+	m := New()
+	m.mode = ModeGoToLine
+	m.buf = buffer.NewBufferFromString("line1\nline2")
+	m.goToLineInput = "999"
+	_, cmd := m.handleGoToLineKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if cmd == nil {
+		t.Error("expected error command for out-of-range line")
+	}
+}

@@ -3,6 +3,7 @@ package editor
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -25,6 +26,9 @@ func (m *Model) View() string {
 	}
 	if m.mode == ModeConfirm {
 		return m.renderConfirm()
+	}
+	if m.mode == ModeGoToLine {
+		return m.renderGoToLine()
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
@@ -191,6 +195,19 @@ func (m *Model) applyIndentGuides(lineText string, rawLine string) string {
 	}
 
 	return b.String()
+}
+
+// --- Go-to-Line ---
+
+func (m *Model) renderGoToLine() string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("Go to line: %s", m.goToLineInput))
+	lines = append(lines, "")
+	lines = append(lines, "Enter to confirm, Esc to cancel")
+
+	content := strings.Join(lines, "\n")
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+		m.paletteStyle.Render(content))
 }
 
 // --- Search bar rendering ---
@@ -452,7 +469,7 @@ func (m *Model) applySearchHighlight(lineText string, lineNum int) string {
 
 	var result strings.Builder
 	pos := 0
-	queryLen := len(m.searchQuery)
+	queryLen := utf8.RuneCountInString(m.searchQuery)
 
 	for i := 0; i <= len(lineText)-queryLen; i++ {
 		logicalPos := lineStart + i

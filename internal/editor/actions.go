@@ -48,6 +48,8 @@ func (m *Model) executeAction(id string) {
 		m.searchMatches = nil
 	case "file.rename":
 		m.enterRename()
+	case "view.go-line":
+		m.enterGoToLine()
 	case "view.toggle-auto-close":
 		m.config.AutoCloseEnabled = !m.config.AutoCloseEnabled
 		SaveConfig(m.config)

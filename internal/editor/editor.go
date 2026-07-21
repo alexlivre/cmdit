@@ -35,6 +35,7 @@ const (
 	ModeSaveAs
 	ModeRename
 	ModeWelcome
+	ModeGoToLine
 )
 
 // ConfirmAction identifies which confirmation dialog is active.
@@ -109,6 +110,8 @@ type Model struct {
 	// Rename state
 	renameInput string
 	renameError string
+
+	goToLineInput string
 
 	// Error display
 	errorMessage string
