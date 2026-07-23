@@ -79,7 +79,7 @@ func BenchmarkSearchInLargeFile(b *testing.B) {
 		m.buf.Insert('\n')
 	}
 
-	m.search.Query = "target"
+	m.searchQuery = "target"
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

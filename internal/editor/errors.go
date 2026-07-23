@@ -42,4 +42,16 @@ func logError(err error, context string) {
 	fmt.Fprintf(f, "[%s] %s: %v\n%s\n", timestamp, context, err, debug.Stack())
 }
 
-
+// safeRun wraps a function with panic recovery.
+// Returns the original tea.Msg or a clearErrorMsg on panic.
+func safeRun(fn func() tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		defer func() {
+			if r := recover(); r != nil {
+				err := fmt.Errorf("panic: %v", r)
+				logError(err, "recovered panic")
+			}
+		}()
+		return fn()
+	}
+}

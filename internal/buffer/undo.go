@@ -1,26 +1,17 @@
 package buffer
 
-type OpType int
-
-const (
-	OpInsert OpType = iota
-	OpDelete
-)
-
-// Operation represents a reversible edit operation.
 type Operation struct {
-	Type OpType
+	Type string
 	Pos  int
 	Text string
 }
 
-// UndoStack provides unlimited undo/redo for buffer operations.
 type UndoStack struct {
-	stack    []Operation
-	position int // Points to next free slot (number of undos available)
+	stack     []Operation
+	position  int
+	unitCount int
 }
 
-// NewUndoStack creates an empty undo stack.
 func NewUndoStack() *UndoStack {
 	return &UndoStack{
 		stack:    make([]Operation, 0, 256),
@@ -28,50 +19,109 @@ func NewUndoStack() *UndoStack {
 	}
 }
 
-// Push records a new operation. Discards any redo history.
 func (u *UndoStack) Push(op Operation) {
-	// Discard redo history
 	u.stack = u.stack[:u.position]
 	u.stack = append(u.stack, op)
 	u.position = len(u.stack)
+	u.unitCount = u.countTotalUnits() // recompute after truncation
 }
 
-// CanUndo returns true if there are operations to undo.
+func (u *UndoStack) PushComposite(ops []Operation) {
+	u.stack = u.stack[:u.position]
+	u.stack = append(u.stack, Operation{Type: "begin-composite"})
+	u.stack = append(u.stack, ops...)
+	u.stack = append(u.stack, Operation{Type: "end-composite"})
+	u.position = len(u.stack)
+	u.unitCount = u.countTotalUnits()
+}
+
+func (u *UndoStack) countTotalUnits() int {
+	total := 0
+	inComposite := false
+	for _, op := range u.stack {
+		switch op.Type {
+		case "begin-composite":
+			inComposite = true
+			total++
+		case "end-composite":
+			inComposite = false
+		default:
+			if !inComposite {
+				total++
+			}
+		}
+	}
+	return total
+}
+
 func (u *UndoStack) CanUndo() bool {
-	return u.position > 0
+	return u.unitCount > 0
 }
 
-// CanRedo returns true if there are operations to redo.
 func (u *UndoStack) CanRedo() bool {
-	return u.position < len(u.stack)
+	return u.unitCount < u.countTotalUnits()
 }
 
-// Undo returns the operation to reverse the most recent edit.
-func (u *UndoStack) Undo() (Operation, bool) {
+func (u *UndoStack) Undo() ([]Operation, bool) {
 	if !u.CanUndo() {
-		return Operation{}, false
+		return nil, false
 	}
 	u.position--
-	return u.stack[u.position], true
+	op := u.stack[u.position]
+	if op.Type == "end-composite" {
+		u.position--
+		var ops []Operation
+		for u.position >= 0 {
+			inner := u.stack[u.position]
+			if inner.Type == "begin-composite" {
+				break // leave position at begin-composite for redo
+			}
+			ops = append(ops, inner)
+			u.position--
+		}
+		u.unitCount--
+		return ops, true
+	}
+	if op.Type == "begin-composite" {
+		return u.Undo()
+	}
+	u.unitCount--
+	return []Operation{op}, true
 }
 
-// Redo returns the operation to re-apply the most recently undone edit.
-func (u *UndoStack) Redo() (Operation, bool) {
+func (u *UndoStack) Redo() ([]Operation, bool) {
 	if !u.CanRedo() {
-		return Operation{}, false
+		return nil, false
 	}
 	op := u.stack[u.position]
+	if op.Type == "begin-composite" {
+		u.position++
+		var ops []Operation
+		for u.position < len(u.stack) {
+			inner := u.stack[u.position]
+			if inner.Type == "end-composite" {
+				u.position++
+				break
+			}
+			ops = append(ops, inner)
+			u.position++
+		}
+		u.unitCount++
+		return ops, true
+	}
 	u.position++
-	return op, true
+	u.unitCount++
+	return []Operation{op}, true
 }
 
-// Clear removes all undo/redo history.
 func (u *UndoStack) Clear() {
 	u.stack = u.stack[:0]
 	u.position = 0
+	u.unitCount = 0
 }
 
-// Len returns the number of undoable operations.
 func (u *UndoStack) Len() int {
-	return u.position
+	return u.unitCount
 }
+
+

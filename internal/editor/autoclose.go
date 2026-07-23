@@ -50,12 +50,12 @@ func (m *Model) handleAutoClose(openChar rune) (tea.Model, tea.Cmd) {
 		// Push undo for openChar first, closer second
 		// LIFO stack: closer pops first (correct: delete ')' then '(')
 		m.undoStack.Push(buffer.Operation{
-			Type: buffer.OpDelete,
+			Type: "delete",
 			Pos:  cursorPos,
 			Text: string(openChar),
 		})
 		m.undoStack.Push(buffer.Operation{
-			Type: buffer.OpDelete,
+			Type: "delete",
 			Pos:  cursorPos + 1,
 			Text: string(closer),
 		})

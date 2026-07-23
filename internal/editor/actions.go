@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/alexb/cmdit/internal/buffer"
 	"github.com/alexb/cmdit/internal/fileio"
@@ -35,27 +36,32 @@ func (m *Model) executeAction(id string) {
 	case "edit.paste":
 		m.paste()
 	case "edit.select-all":
-		m.selection.Start = 0
-		m.selection.End = m.buf.Len()
+		m.selStart = 0
+		m.selEnd = m.buf.Len()
 	case "search.find":
 		m.mode = ModeSearch
-		m.search.Query = ""
-		m.search.Matches = nil
+		m.searchQuery = ""
+		m.searchMatches = nil
 	case "search.replace":
 		m.mode = ModeReplace
-		m.search.Query = ""
-		m.search.Replace = ""
-		m.search.Matches = nil
+		m.searchQuery = ""
+		m.replaceQuery = ""
+		m.searchMatches = nil
 	case "file.rename":
 		m.enterRename()
+	case "view.go-line":
+		m.enterGoToLine()
 	case "view.toggle-auto-close":
 		m.config.AutoCloseEnabled = !m.config.AutoCloseEnabled
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-auto-close")
+		}
 	case "view.toggle-vim-mode":
 		m.config.VimMode = !m.config.VimMode
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-vim-mode")
+		}
 	case "view.next-theme":
-		// Cycle through themes
 		themes := []string{"dark", "light", "monokai", "dracula", "solarized-dark"}
 		current := m.config.Theme
 		for i, t := range themes {
@@ -65,16 +71,24 @@ func (m *Model) executeAction(id string) {
 			}
 		}
 		m.highlighter.SetTheme(m.config.Theme)
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config next-theme")
+		}
 	case "view.toggle-word-wrap":
 		m.config.WordWrap = !m.config.WordWrap
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-word-wrap")
+		}
 	case "file.toggle-format-on-save":
 		m.config.FormatOnSave = !m.config.FormatOnSave
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-format-on-save")
+		}
 	case "file.toggle-auto-save":
 		m.config.AutoSaveEnabled = !m.config.AutoSaveEnabled
-		SaveConfig(m.config)
+		if err := SaveConfig(m.config); err != nil {
+			logError(err, "save config toggle-auto-save")
+		}
 	}
 }
 
@@ -86,7 +100,7 @@ func (m *Model) save() {
 		return
 	}
 	if err := fileio.Save(m.filename, m.buf); err != nil {
-		m.showError(fmt.Sprintf("Save failed: %v", err))
+		m.showError(fmt.Sprintf("Save error: %v", err))
 		return
 	}
 	m.modified = false
@@ -94,19 +108,20 @@ func (m *Model) save() {
 	if m.config.FormatOnSave {
 		m.applyFormat()
 		if err := fileio.Save(m.filename, m.buf); err != nil {
-			m.showError(fmt.Sprintf("Save after format failed: %v", err))
+			m.showError(fmt.Sprintf("Format save error: %v", err))
 		}
 	}
 }
 
 func (m *Model) openFile(path string) {
+	// Sanitize path to prevent traversal
 	path = filepath.Clean(path)
 
+	// Stop any existing LSP
 	m.stopLSP()
 
 	b, err := fileio.Load(path)
 	if err != nil {
-		m.showError(fmt.Sprintf("Failed to open file: %v", err))
 		return
 	}
 	m.buf = b
@@ -125,18 +140,19 @@ func (m *Model) openFile(path string) {
 // --- Undo/Redo ---
 
 func (m *Model) undo() {
-	op, ok := m.undoStack.Undo()
+	ops, ok := m.undoStack.Undo()
 	if !ok {
 		return
 	}
-
-	m.moveGapTo(op.Pos)
-	switch op.Type {
-	case buffer.OpInsert:
-		m.buf.InsertString(op.Text)
-	case buffer.OpDelete:
-		for i := 0; i < len(op.Text); i++ {
-			m.buf.DeleteForward()
+	for _, op := range ops {
+		m.moveGapTo(op.Pos)
+		switch op.Type {
+		case "insert":
+			m.buf.InsertString(op.Text)
+		case "delete":
+			for i := 0; i < utf8.RuneCountInString(op.Text); i++ {
+				m.buf.DeleteForward()
+			}
 		}
 	}
 	m.modified = true
@@ -146,19 +162,20 @@ func (m *Model) undo() {
 }
 
 func (m *Model) redo() {
-	op, ok := m.undoStack.Redo()
+	ops, ok := m.undoStack.Redo()
 	if !ok {
 		return
 	}
-
-	m.moveGapTo(op.Pos)
-	switch op.Type {
-	case buffer.OpInsert:
-		for i := 0; i < len(op.Text); i++ {
-			m.buf.DeleteForward()
+	for _, op := range ops {
+		m.moveGapTo(op.Pos)
+		switch op.Type {
+		case "insert":
+			for i := 0; i < utf8.RuneCountInString(op.Text); i++ {
+				m.buf.DeleteForward()
+			}
+		case "delete":
+			m.buf.InsertString(op.Text)
 		}
-	case buffer.OpDelete:
-		m.buf.InsertString(op.Text)
 	}
 	m.modified = true
 	m.cursor.Line, m.cursor.Col = m.buf.LineCol(m.buf.GapPosition())
@@ -176,8 +193,8 @@ func (m *Model) copy() {
 		text := m.currentLineText()
 		m.clipboard.Copy(text)
 	}
-	m.selection.Start = -1
-	m.selection.End = -1
+	m.selStart = -1
+	m.selEnd = -1
 }
 
 func (m *Model) cut() {
@@ -186,9 +203,19 @@ func (m *Model) cut() {
 		m.deleteSelection()
 	} else {
 		m.clipboard.Copy(m.currentLineText())
-		m.moveGapTo(m.buf.LineStart(m.cursor.Line))
+		lineStart := m.buf.LineStart(m.cursor.Line)
 		lineEnd := m.buf.LineStart(m.cursor.Line + 1)
-		for i := m.buf.LineStart(m.cursor.Line); i < lineEnd && m.buf.GapPosition() < m.buf.Len(); i++ {
+		var sb strings.Builder
+		for i := lineStart; i < lineEnd && i < m.buf.Len(); i++ {
+			sb.WriteRune(m.buf.RuneAt(i))
+		}
+		m.undoStack.Push(buffer.Operation{
+			Type: "insert",
+			Pos:  lineStart,
+			Text: sb.String(),
+		})
+		m.moveGapTo(lineStart)
+		for i := lineStart; i < lineEnd && m.buf.GapPosition() < m.buf.Len(); i++ {
 			m.buf.DeleteForward()
 		}
 		m.modified = true
@@ -199,12 +226,12 @@ func (m *Model) paste() {
 	if m.clipboard.HasText() {
 		text := m.clipboard.Paste()
 		m.undoStack.Push(buffer.Operation{
-			Type: buffer.OpDelete,
+			Type: "delete",
 			Pos:  m.buf.GapPosition(),
 			Text: text,
 		})
 		m.buf.InsertString(text)
-		m.cursor.Col += len(text)
+		m.cursor.Col += utf8.RuneCountInString(text)
 		m.modified = true
 		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 	}
@@ -213,15 +240,15 @@ func (m *Model) paste() {
 // --- Selection ---
 
 func (m *Model) hasSelection() bool {
-	return m.selection.Start >= 0 && m.selection.End >= 0 && m.selection.Start != m.selection.End
+	return m.selStart >= 0 && m.selEnd >= 0 && m.selStart != m.selEnd
 }
 
 func (m *Model) getSelectedText() string {
 	if !m.hasSelection() {
 		return ""
 	}
-	start := m.selection.Start
-	end := m.selection.End
+	start := m.selStart
+	end := m.selEnd
 	if start > end {
 		start, end = end, start
 	}
@@ -234,8 +261,8 @@ func (m *Model) getSelectedText() string {
 }
 
 func (m *Model) clearSelection() {
-	m.selection.Start = -1
-	m.selection.End = -1
+	m.selStart = -1
+	m.selEnd = -1
 }
 
 func (m *Model) deleteSelection() {
@@ -244,13 +271,13 @@ func (m *Model) deleteSelection() {
 	}
 	text := m.getSelectedText()
 	m.undoStack.Push(buffer.Operation{
-		Type: buffer.OpInsert,
-		Pos:  m.selection.Start,
+		Type: "insert",
+		Pos:  m.selStart,
 		Text: text,
 	})
 
-	start := m.selection.Start
-	end := m.selection.End
+	start := m.selStart
+	end := m.selEnd
 	if start > end {
 		start, end = end, start
 	}
@@ -259,54 +286,55 @@ func (m *Model) deleteSelection() {
 	for i := 0; i < end-start; i++ {
 		m.buf.DeleteForward()
 	}
-	m.selection.Start = -1
-	m.selection.End = -1
+	m.selStart = -1
+	m.selEnd = -1
 	m.modified = true
 }
 
 // --- Search ---
 
 func (m *Model) doSearch() {
-	if m.search.Query == "" {
-		m.search.Matches = nil
+	if m.searchQuery == "" {
 		return
 	}
-	m.search.Last = m.search.Query
+	m.lastSearch = m.searchQuery
 
-	content := m.buf.String()
-	contentRunes := []rune(content)
-	queryRunes := []rune(strings.ToLower(m.search.Query))
-	queryLen := len(queryRunes)
+	// Search in rune-space so match indices are logical rune indices
+	// (RuneAt/navigation work in runes, not bytes).
+	contentRunes := []rune(m.buf.String())
+	queryRunes := []rune(strings.ToLower(m.searchQuery))
 
-	m.search.Matches = nil
-	m.search.Current = 0
-
-	for i := 0; i <= len(contentRunes)-queryLen; i++ {
+	m.searchMatches = nil
+	for i := 0; i+len(queryRunes) <= len(contentRunes); i++ {
 		match := true
-		for j := 0; j < queryLen; j++ {
+		for j := 0; j < len(queryRunes); j++ {
 			if unicode.ToLower(contentRunes[i+j]) != queryRunes[j] {
 				match = false
 				break
 			}
 		}
 		if match {
-			byteOffset := len(string(contentRunes[:i]))
-			m.search.Matches = append(m.search.Matches, byteOffset)
+			m.searchMatches = append(m.searchMatches, i)
 		}
 	}
+	m.searchCurrent = 0
 }
 
 func (m *Model) doReplace() {
-	if len(m.search.Matches) == 0 || m.search.Replace == "" {
+	if len(m.searchMatches) == 0 || m.replaceQuery == "" {
 		return
 	}
 
-	pos := m.search.Matches[m.search.Current]
+	pos := m.searchMatches[m.searchCurrent]
+	m.undoStack.PushComposite([]buffer.Operation{
+		{Type: "insert", Pos: pos, Text: m.searchQuery},
+		{Type: "delete", Pos: pos, Text: m.replaceQuery},
+	})
 	m.moveGapTo(pos)
-	for i := 0; i < len(m.search.Query); i++ {
+	for i := 0; i < utf8.RuneCountInString(m.searchQuery); i++ {
 		m.buf.DeleteForward()
 	}
-	m.buf.InsertString(m.search.Replace)
+	m.buf.InsertString(m.replaceQuery)
 	m.modified = true
 
 	m.doSearch()

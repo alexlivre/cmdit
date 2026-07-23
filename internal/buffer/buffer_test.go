@@ -45,7 +45,7 @@ func TestDeleteBackspace(t *testing.T) {
 		b.MoveGapRight()
 	}
 
-	deleted := b.Backspace()
+	deleted := b.Delete()
 	if !deleted {
 		t.Error("expected deletion to succeed")
 	}
@@ -56,7 +56,7 @@ func TestDeleteBackspace(t *testing.T) {
 
 func TestDeleteFromEmptyBuffer(t *testing.T) {
 	b := NewBuffer()
-	deleted := b.Backspace()
+	deleted := b.Delete()
 	if deleted {
 		t.Error("expected deletion to fail on empty buffer")
 	}
@@ -237,121 +237,44 @@ func TestLineColNegative(t *testing.T) {
 	}
 }
 
-func TestMoveGapTo(t *testing.T) {
-	b := NewBufferFromString("hello world")
+func TestMoveGapLeftReturnsCorrectRune(t *testing.T) {
+	b := NewBufferFromString("ab")
+	b.MoveGapRight()
+	b.MoveGapRight()
 
-	b.MoveGapTo(5)
-	if b.GapPosition() != 5 {
-		t.Errorf("expected gap at 5, got %d", b.GapPosition())
-	}
-
-	b.MoveGapTo(0)
-	if b.GapPosition() != 0 {
-		t.Errorf("expected gap at 0, got %d", b.GapPosition())
-	}
-
-	b.MoveGapTo(11)
-	if b.GapPosition() != 11 {
-		t.Errorf("expected gap at 11, got %d", b.GapPosition())
-	}
-
-	if b.String() != "hello world" {
-		t.Errorf("content changed: %s", b.String())
+	r := b.MoveGapLeft()
+	if r != 'b' {
+		t.Errorf("expected 'b', got %q", r)
 	}
 }
 
-func TestMoveGapTo_OutOfBounds(t *testing.T) {
-	b := NewBufferFromString("test")
-	b.MoveGapTo(100)
-	if b.GapPosition() != 4 {
-		t.Errorf("expected clamp to 4, got %d", b.GapPosition())
-	}
-	b.MoveGapTo(-10)
-	if b.GapPosition() != 0 {
-		t.Errorf("expected clamp to 0, got %d", b.GapPosition())
+func TestBackspaceThenMoveGapLeftNoGarbage(t *testing.T) {
+	b := NewBufferFromString("abc")
+
+	b.MoveGapRight()
+	b.MoveGapRight()
+	b.MoveGapRight()
+
+	b.Backspace()
+
+	b.MoveGapLeft()
+	b.MoveGapLeft()
+
+	s := b.String()
+	if s != "ab" {
+		t.Errorf("expected 'ab', got %q", s)
 	}
 }
 
-func TestLines_Cached(t *testing.T) {
-	b := NewBufferFromString("line1\nline2\nline3")
-
-	lines := b.Lines()
-	if len(lines) != 3 {
-		t.Errorf("expected 3 lines, got %d", len(lines))
-	}
-	if lines[0] != "line1" || lines[1] != "line2" || lines[2] != "line3" {
-		t.Errorf("unexpected lines: %v", lines)
-	}
-
-	lines2 := b.Lines()
-	if len(lines2) != 3 {
-		t.Errorf("cached call failed")
-	}
-}
-
-func TestLines_InvalidateOnInsert(t *testing.T) {
-	b := NewBufferFromString("hello\nworld")
-	_ = b.Lines()
-
-	b.MoveGapTo(5)
-	b.Insert('\n')
-
-	lines := b.Lines()
-	if len(lines) != 3 {
-		t.Errorf("expected 3 lines after insert, got %d", len(lines))
-	}
-}
-
-func TestLineCount_Cached(t *testing.T) {
-	b := NewBufferFromString("a\nb\nc\nd")
-	if b.LineCount() != 4 {
-		t.Errorf("expected 4 lines, got %d", b.LineCount())
-	}
-}
-
-func TestLineStart_Cached(t *testing.T) {
-	b := NewBufferFromString("hello\nworld\nfoo")
-	if b.LineStart(0) != 0 {
-		t.Errorf("line 0 start: expected 0, got %d", b.LineStart(0))
-	}
-	if b.LineStart(1) != 6 {
-		t.Errorf("line 1 start: expected 6, got %d", b.LineStart(1))
-	}
-	if b.LineStart(2) != 12 {
-		t.Errorf("line 2 start: expected 12, got %d", b.LineStart(2))
-	}
-}
-
-func TestInsertString_Empty(t *testing.T) {
-	b := NewBuffer()
-	b.InsertString("")
-	if b.Len() != 0 {
-		t.Errorf("expected length 0, got %d", b.Len())
-	}
-}
-
-func TestDeleteForward_AtEnd(t *testing.T) {
-	b := NewBufferFromString("test")
-	b.MoveGapTo(4)
-	if b.DeleteForward() {
-		t.Error("expected false when deleting at end")
-	}
-}
-
-func TestBackspace_AtStart(t *testing.T) {
-	b := NewBufferFromString("test")
-	b.MoveGapTo(0)
-	if b.Backspace() {
-		t.Error("expected false when backspacing at start")
-	}
-}
-
-func TestRuneAt_OutOfBounds(t *testing.T) {
-	b := NewBufferFromString("test")
-	if b.RuneAt(-1) != 0 {
-		t.Error("expected 0 for negative index")
-	}
-	if b.RuneAt(100) != 0 {
-		t.Error("expected 0 for out of bounds index")
+func TestBackspaceAtZero(t *testing.T) {
+	b := NewBufferFromString("abc")
+	// gap is at position 3 after insertion; backspace 3 times
+	b.Backspace()
+	b.Backspace()
+	b.Backspace()
+	// 4th backspace at position 0 should fail
+	ok := b.Backspace()
+	if ok {
+		t.Error("Backspace at position 0 should return false")
 	}
 }

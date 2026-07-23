@@ -47,5 +47,6 @@ temp/
 .qwen/
 ".playwright-mcp/"
 
-# OpenCode plans
-.opencode/
+# Build artifacts / cache
+.codegraph/
+coverage  

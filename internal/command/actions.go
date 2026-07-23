@@ -2,8 +2,6 @@
 package command
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -45,12 +43,37 @@ func (r *Registry) Filter(query string) []Action {
 		return r.actions
 	}
 
-	qlower := strings.ToLower(query)
 	var result []Action
+	qlower := toLower(query)
 	for _, a := range r.actions {
-		if strings.Contains(strings.ToLower(a.Label), qlower) || strings.Contains(strings.ToLower(a.ID), qlower) {
+		if contains(toLower(a.Label), qlower) || contains(toLower(a.ID), qlower) {
 			result = append(result, a)
 		}
 	}
 	return result
+}
+
+func contains(s, substr string) bool {
+	return len(substr) == 0 || len(s) >= len(substr) && indexOf(s, substr) >= 0
+}
+
+func indexOf(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
+
+func toLower(s string) string {
+	b := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 32
+		}
+		b[i] = c
+	}
+	return string(b)
 }

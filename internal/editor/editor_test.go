@@ -210,8 +210,8 @@ func TestSearchExecute(t *testing.T) {
 	// Press Enter to search
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 
-	if len(m.search.Matches) != 2 {
-		t.Errorf("expected 2 matches, got %d", len(m.search.Matches))
+	if len(m.searchMatches) != 2 {
+		t.Errorf("expected 2 matches, got %d", len(m.searchMatches))
 	}
 }
 
@@ -246,8 +246,8 @@ func TestRenameEnterAndCancel(t *testing.T) {
 	if m.mode != ModeRename {
 		t.Errorf("expected ModeRename, got %v", m.mode)
 	}
-	if m.rename.Input != "test.txt" {
-		t.Errorf("expected renameInput 'test.txt', got %q", m.rename.Input)
+	if m.renameInput != "test.txt" {
+		t.Errorf("expected renameInput 'test.txt', got %q", m.renameInput)
 	}
 
 	// Esc cancels and returns to normal
@@ -275,8 +275,8 @@ func TestRenameSuccess(t *testing.T) {
 
 	// Enter rename mode
 	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
-	if m.rename.Input != "old.txt" {
-		t.Errorf("expected renameInput 'old.txt', got %q", m.rename.Input)
+	if m.renameInput != "old.txt" {
+		t.Errorf("expected renameInput 'old.txt', got %q", m.renameInput)
 	}
 
 	// Clear and type new name
@@ -327,7 +327,7 @@ func TestRenameEmptyName(t *testing.T) {
 	// Press Enter with empty name
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 
-	if m.rename.Error == "" {
+	if m.renameError == "" {
 		t.Error("expected error for empty name")
 	}
 	if m.mode != ModeRename {
@@ -383,7 +383,7 @@ func TestRenameInvalidChars(t *testing.T) {
 		}
 		m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 
-		if m.rename.Error == "" {
+		if m.renameError == "" {
 			t.Errorf("expected error for invalid name %q", invalid)
 		}
 		if m.mode != ModeRename {
@@ -418,7 +418,7 @@ func TestRenameExistingFile(t *testing.T) {
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 
-	if m.rename.Error == "" {
+	if m.renameError == "" {
 		t.Error("expected error when destination exists")
 	}
 	if m.mode != ModeRename {
@@ -492,8 +492,8 @@ func TestPaletteActionRename(t *testing.T) {
 	if m.mode != ModeRename {
 		t.Errorf("expected ModeRename via palette, got %v", m.mode)
 	}
-	if m.rename.Input != "test.txt" {
-		t.Errorf("expected renameInput 'test.txt', got %q", m.rename.Input)
+	if m.renameInput != "test.txt" {
+		t.Errorf("expected renameInput 'test.txt', got %q", m.renameInput)
 	}
 }
 
@@ -593,8 +593,8 @@ func TestCutAndDeleteSelection(t *testing.T) {
 	for _, r := range "delete this" {
 		m.buf.Insert(r)
 	}
-	m.selection.Start = 0
-	m.selection.End = 6
+	m.selStart = 0
+	m.selEnd = 6
 	m.cursor.SetPos(0, 6)
 	m.moveGapTo(0)
 	m.deleteSelection()
@@ -621,17 +621,17 @@ func TestDoReplace(t *testing.T) {
 		m.buf.Insert(r)
 	}
 
-	m.search.Query = "foo"
-	m.search.Replace = "baz"
+	m.searchQuery = "foo"
+	m.replaceQuery = "baz"
 	m.doSearch()
 
 	// Verify search found matches
-	if len(m.search.Matches) != 2 {
-		t.Fatalf("expected 2 matches, got %d", len(m.search.Matches))
+	if len(m.searchMatches) != 2 {
+		t.Fatalf("expected 2 matches, got %d", len(m.searchMatches))
 	}
 
 	// Replace first
-	m.search.Current = 0
+	m.searchCurrent = 0
 	m.doReplace()
 	if m.buf.String() != "baz bar foo" {
 		t.Errorf("expected 'baz bar foo', got %q", m.buf.String())

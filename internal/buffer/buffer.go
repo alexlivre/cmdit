@@ -4,7 +4,6 @@
 package buffer
 
 import (
-	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -17,9 +16,6 @@ type Buffer struct {
 	length   int
 	gapStart int
 	gapEnd   int
-
-	lineOffsets []int
-	cacheValid  bool
 }
 
 // NewBuffer creates an empty gap buffer.
@@ -50,7 +46,6 @@ func (b *Buffer) Insert(r rune) {
 	b.data[b.gapStart] = r
 	b.gapStart++
 	b.length++
-	b.cacheValid = false
 }
 
 // InsertString inserts a string at the current gap position.
@@ -67,12 +62,16 @@ func (b *Buffer) Backspace() bool {
 		return false
 	}
 	b.gapStart--
+	b.data[b.gapStart] = 0
 	b.length--
-	b.cacheValid = false
 	return true
 }
 
-
+// Delete removes the rune to the left of the gap (backspace).
+// Deprecated: use Backspace instead.
+func (b *Buffer) Delete() bool {
+	return b.Backspace()
+}
 
 // DeleteForward removes the rune to the right of the gap (delete key).
 // Returns true if a character was deleted.
@@ -82,7 +81,6 @@ func (b *Buffer) DeleteForward() bool {
 	}
 	b.gapEnd++
 	b.length--
-	b.cacheValid = false
 	return true
 }
 
@@ -95,8 +93,9 @@ func (b *Buffer) MoveGapLeft() rune {
 	}
 	b.gapStart--
 	b.gapEnd--
-	b.data[b.gapEnd] = b.data[b.gapStart]
-	return b.data[b.gapStart]
+	ch := b.data[b.gapStart]
+	b.data[b.gapEnd] = ch
+	return ch
 }
 
 // MoveGapRight moves the gap one position to the right.
@@ -108,35 +107,6 @@ func (b *Buffer) MoveGapRight() {
 	b.data[b.gapStart] = b.data[b.gapEnd]
 	b.gapStart++
 	b.gapEnd++
-}
-
-// MoveGapTo moves the gap to the specified position using copy() for O(n) performance.
-func (b *Buffer) MoveGapTo(pos int) {
-	if pos < 0 {
-		pos = 0
-	}
-	if pos > b.length {
-		pos = b.length
-	}
-
-	current := b.gapStart
-	if pos == current {
-		return
-	}
-
-	gapSize := b.gapEnd - b.gapStart
-
-	if pos > current {
-		n := pos - current
-		copy(b.data[b.gapStart:], b.data[b.gapEnd:b.gapEnd+n])
-		b.gapStart += n
-		b.gapEnd += n
-	} else {
-		n := current - pos
-		copy(b.data[pos+gapSize:], b.data[pos:pos+n])
-		b.gapStart = pos
-		b.gapEnd = pos + gapSize
-	}
 }
 
 // GapPosition returns the current cursor position (gap start index).
@@ -174,80 +144,71 @@ func (b *Buffer) String() string {
 	return sb.String()
 }
 
-// Lines returns the text split into lines (cached).
+// Lines returns the text split into lines.
 func (b *Buffer) Lines() []string {
-	b.buildLineCache()
-	runes := []rune(b.String())
-	lines := make([]string, len(b.lineOffsets))
-	for i := range b.lineOffsets {
-		start := b.lineOffsets[i]
-		var end int
-		if i+1 < len(b.lineOffsets) {
-			end = b.lineOffsets[i+1] - 1
-		} else {
-			end = b.length
-		}
-		if start > end {
-			start = end
-		}
-		if end > len(runes) {
-			end = len(runes)
-		}
-		if start > len(runes) {
-			start = len(runes)
-		}
-		lines[i] = string(runes[start:end])
-	}
-	return lines
+	return strings.Split(b.String(), "\n")
 }
 
-// LineCount returns the number of lines in the buffer (cached).
+// LineCount returns the number of lines in the buffer.
 func (b *Buffer) LineCount() int {
-	b.buildLineCache()
-	return len(b.lineOffsets)
+	count := 1
+	for i := 0; i < b.length; i++ {
+		if b.RuneAt(i) == '\n' {
+			count++
+		}
+	}
+	return count
 }
 
-// LineStart returns the logical index of the start of the given line (cached).
+// LineStart returns the logical index of the start of the given line (0-based).
 func (b *Buffer) LineStart(line int) int {
-	b.buildLineCache()
 	if line <= 0 {
 		return 0
 	}
-	if line >= len(b.lineOffsets) {
-		return b.length
+	currentLine := 0
+	for i := 0; i < b.length; i++ {
+		if currentLine == line {
+			return i
+		}
+		if b.RuneAt(i) == '\n' {
+			currentLine++
+		}
 	}
-	return b.lineOffsets[line]
+	return b.length
 }
 
-// LineCol converts a logical index to (line, col) using cache.
+// LineCol converts a logical index to (line, col).
 func (b *Buffer) LineCol(index int) (int, int) {
-	b.buildLineCache()
 	if index < 0 {
 		return 0, 0
 	}
 	if index >= b.length {
-		index = b.length
+		// Return last position
+		line := 0
+		col := 0
+		for i := 0; i < b.length; i++ {
+			if b.RuneAt(i) == '\n' {
+				line++
+				col = 0
+			} else {
+				col++
+			}
+		}
+		return line, col
 	}
 
-	line := sort.SearchInts(b.lineOffsets, index+1) - 1
-	if line < 0 {
-		line = 0
-	}
-	col := index - b.lineOffsets[line]
-	return line, col
-}
-
-func (b *Buffer) buildLineCache() {
-	if b.cacheValid {
-		return
-	}
-	b.lineOffsets = []int{0}
-	for i := 0; i < b.length; i++ {
-		if b.RuneAt(i) == '\n' {
-			b.lineOffsets = append(b.lineOffsets, i+1)
+	line := 0
+	col := 0
+	for i := 0; i < index; i++ {
+		r := b.RuneAt(i)
+		if r == '\n' {
+			line++
+			col = 0
+		} else {
+			col++
 		}
 	}
-	b.cacheValid = true
+	return line, col
 }
 
 // ByteOffset returns the byte offset corresponding to the given logical rune index.

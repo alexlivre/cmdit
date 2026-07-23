@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -20,6 +21,11 @@ import (
 	"github.com/alexb/cmdit/internal/lsp"
 	"github.com/alexb/cmdit/internal/renderer"
 )
+
+// Version is the current released version of cmdit, shown in the welcome
+// screen and other user-facing surfaces. Bump this together with the
+// CHANGELOG / README badge on each release.
+const Version = "v0.4.2"
 
 // Mode represents the current editor mode.
 type Mode int
@@ -34,6 +40,7 @@ const (
 	ModeSaveAs
 	ModeRename
 	ModeWelcome
+	ModeGoToLine
 )
 
 // ConfirmAction identifies which confirmation dialog is active.
@@ -78,18 +85,38 @@ type Model struct {
 
 	confirmAction ConfirmAction
 
-	// State structs
-	search     SearchState
-	palette    PaletteState
-	filePicker FilePickerState
-	selection  SelectionState
-	rename     RenameState
+	// Selection (logical indices)
+	selStart int
+	selEnd   int
 
-	// Save-as query
-	saveAsQuery string
+	// Search state
+	searchQuery   string
+	searchMatches []int
+	searchCurrent int
+	replaceQuery  string
+	lastSearch    string
+
+	// Palette state
+	paletteActions []command.Action
+	paletteQuery   string
+	paletteResults []command.Action
+	paletteSel     int
+
+	// File picker state
+	filePickerDir   string
+	filePickerFiles []string
+	filePickerSel   int
+	filePickerQuery string
+	saveAsQuery     string
 
 	// Recent files
 	recentFiles []string
+
+	// Rename state
+	renameInput string
+	renameError string
+
+	goToLineInput string
 
 	// Error display
 	errorMessage string
@@ -151,7 +178,8 @@ func New() *Model {
 		mode:             ModeWelcome,
 		language:         "",
 		highlighter:      highlight.NewHighlighter(highlight.ThemeDark),
-		selection:        SelectionState{Start: -1, End: -1},
+		selStart:         -1,
+		selEnd:           -1,
 		statusStyle:      lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252")).Padding(0, 1),
 		statusModified:   lipgloss.NewStyle().Foreground(lipgloss.Color("214")),
 		statusNormal:     lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
@@ -204,7 +232,7 @@ func NewWithFile(path string) (*Model, error) {
 
 // registerActions populates the command palette actions.
 func (m *Model) registerActions() {
-	m.palette.Actions = []command.Action{
+	m.paletteActions = []command.Action{
 		{ID: "file.save", Label: "Save", Shortcut: "Ctrl+S"},
 		{ID: "file.save-as", Label: "Save As", Shortcut: "F3"},
 		{ID: "file.open", Label: "Open File", Shortcut: "Ctrl+O"},
@@ -283,30 +311,19 @@ func (m *Model) SetFilename(name string) {
 // ResetMode forces the editor back to Normal mode (used when switching tabs).
 func (m *Model) ResetMode() { m.mode = ModeNormal }
 
-// Save exports the save operation for the tab container.
+// Save exports the save operation for external callers (e.g. tab container).
+// It routes through the proper save() path so errors are surfaced via the
+// status bar instead of being silently dropped and the buffer being wrongly
+// marked clean. If there is no filename it falls back to the save-as prompt.
 func (m *Model) Save() {
-	if m.filename == "" {
-		m.filename = "untitled.txt"
-	}
-	if err := fileio.Save(m.filename, m.buf); err != nil {
-		m.showError(fmt.Sprintf("Save failed: %v", err))
-		return
-	}
-	m.modified = false
-
-	if m.config.FormatOnSave {
-		m.applyFormat()
-		if err := fileio.Save(m.filename, m.buf); err != nil {
-			m.showError(fmt.Sprintf("Save after format failed: %v", err))
-		}
-	}
+	m.save()
 }
 
 // --- Helpers ---
 
 func (m *Model) insertText(text string) {
 	m.undoStack.Push(buffer.Operation{
-		Type: buffer.OpDelete,
+		Type: "delete",
 		Pos:  m.buf.GapPosition(),
 		Text: text,
 	})
@@ -322,28 +339,38 @@ func (m *Model) insertTextAtAllCursors(text string) {
 	}
 
 	all := m.allCursors()
-	// Process from end to start to preserve positions
+	var ops []buffer.Operation
 	for i := len(all) - 1; i >= 0; i-- {
 		m.moveGapTo(all[i].GapPos)
-		m.undoStack.Push(buffer.Operation{
-			Type: buffer.OpDelete,
+		ops = append(ops, buffer.Operation{
+			Type: "delete",
 			Pos:  all[i].GapPos,
 			Text: text,
 		})
 		m.buf.InsertString(text)
 	}
+	m.undoStack.PushComposite(ops)
 
-	// Update cursor and extra cursors
-	m.cursor.Col += len(text)
+	delta := utf8.RuneCountInString(text)
+	m.cursor.Col += delta
 	for i := range m.extraCursors {
-		m.extraCursors[i].Col += len(text)
+		m.extraCursors[i].Col += delta
 	}
 	m.modified = true
 	m.sendDidChange()
 }
 
 func (m *Model) moveGapTo(pos int) {
-	m.buf.MoveGapTo(pos)
+	current := m.buf.GapPosition()
+	if pos > current {
+		for i := current; i < pos; i++ {
+			m.buf.MoveGapRight()
+		}
+	} else {
+		for i := current; i > pos; i-- {
+			m.buf.MoveGapLeft()
+		}
+	}
 }
 
 func (m *Model) syncGapToCursor() {
@@ -444,19 +471,20 @@ func (m *Model) moveCursorRight() {
 
 func (m *Model) moveCursorWordLeft() {
 	lineText := m.currentLineText()
+	runes := []rune(lineText)
 	if m.cursor.Col == 0 {
 		if m.cursor.Line > 0 {
 			m.cursor.Line--
 			prevLineText := m.lineText(m.cursor.Line)
-			m.cursor.Col = len(prevLineText)
+			m.cursor.Col = utf8.RuneCountInString(prevLineText)
 		}
 		m.syncGapToCursor()
 		return
 	}
-	for m.cursor.Col > 0 && isSpace(rune(lineText[m.cursor.Col-1])) {
+	for m.cursor.Col > 0 && isSpace(runes[m.cursor.Col-1]) {
 		m.cursor.Col--
 	}
-	for m.cursor.Col > 0 && !isSpace(rune(lineText[m.cursor.Col-1])) {
+	for m.cursor.Col > 0 && !isSpace(runes[m.cursor.Col-1]) {
 		m.cursor.Col--
 	}
 	m.syncGapToCursor()
@@ -464,7 +492,8 @@ func (m *Model) moveCursorWordLeft() {
 
 func (m *Model) moveCursorWordRight() {
 	lineText := m.currentLineText()
-	if m.cursor.Col >= len(lineText) {
+	runes := []rune(lineText)
+	if m.cursor.Col >= len(runes) {
 		if m.cursor.Line < m.buf.LineCount()-1 {
 			m.cursor.Line++
 			m.cursor.Col = 0
@@ -472,10 +501,10 @@ func (m *Model) moveCursorWordRight() {
 		m.syncGapToCursor()
 		return
 	}
-	for m.cursor.Col < len(lineText) && !isSpace(rune(lineText[m.cursor.Col])) {
+	for m.cursor.Col < len(runes) && !isSpace(runes[m.cursor.Col]) {
 		m.cursor.Col++
 	}
-	for m.cursor.Col < len(lineText) && isSpace(rune(lineText[m.cursor.Col])) {
+	for m.cursor.Col < len(runes) && isSpace(runes[m.cursor.Col]) {
 		m.cursor.Col++
 	}
 	m.syncGapToCursor()
@@ -515,7 +544,7 @@ func (m *Model) loadRecentFiles() {
 	if err != nil {
 		return
 	}
-	path := filepath.Join(home, ".cmdit", "recent.txt")
+	path := filepath.Join(home, ".cmdit", "recent.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -537,7 +566,9 @@ func (m *Model) SaveRecentFiles() {
 	os.WriteFile(path, []byte(strings.Join(m.recentFiles, "\n")), 0600)
 }
 
-
+func (m *Model) saveRecentFiles() {
+	m.SaveRecentFiles()
+}
 
 // validateFileName checks for invalid characters in a file name.
 func validateFileName(name string) error {
@@ -572,19 +603,26 @@ func (m *Model) wordAtCursor() string {
 		return ""
 	}
 
-	start := m.cursor.Col
-	for start > 0 && isWordChar(rune(line[start-1])) {
+	// Operate in rune-space so multibyte sequences are not split.
+	runes := []rune(line)
+	col := m.cursor.Col
+	if col > len(runes) {
+		col = len(runes)
+	}
+
+	start := col
+	for start > 0 && isWordChar(runes[start-1]) {
 		start--
 	}
-	end := m.cursor.Col
-	for end < len(line) && isWordChar(rune(line[end])) {
+	end := col
+	for end < len(runes) && isWordChar(runes[end]) {
 		end++
 	}
 
 	if start == end {
 		return ""
 	}
-	return line[start:end]
+	return string(runes[start:end])
 }
 
 func isWordChar(r rune) bool {
@@ -598,14 +636,12 @@ func (m *Model) addNextOccurrence() {
 		return
 	}
 
-	// Build list of existing positions (primary + extras)
 	existing := make(map[int]bool)
 	existing[m.buf.GapPosition()] = true
 	for _, c := range m.extraCursors {
 		existing[c.GapPos] = true
 	}
 
-	// Start search from after the last cursor position
 	lastPos := m.buf.GapPosition()
 	for _, c := range m.extraCursors {
 		if c.GapPos > lastPos {
@@ -614,45 +650,29 @@ func (m *Model) addNextOccurrence() {
 	}
 
 	content := m.buf.String()
+	if lastPos+1 >= len(content) {
+		return
+	}
 	searchStart := lastPos + 1
 
 	idx := strings.Index(content[searchStart:], word)
-	if idx == -1 {
-		// Wrap around: search from beginning
+	if idx >= 0 {
+		idx += searchStart
+	} else {
 		idx = strings.Index(content, word)
 	}
-	if idx == -1 {
+	if idx < 0 || idx >= len(content) {
+		return
+	}
+	if existing[idx] {
 		return
 	}
 
-	// Calculate actual position
-	actualPos := idx
-	if actualPos < len(content) && actualPos >= searchStart {
-		// already correct
-	} else if idx >= 0 && idx < searchStart-lastPos+searchStart {
-		actualPos = idx
-	} else {
-		actualPos = searchStart + idx
-	}
-
-	// Clamp
-	if actualPos >= len(content) {
-		actualPos = idx
-	}
-	if actualPos >= len(content) {
-		return
-	}
-
-	// Don't add duplicates
-	if existing[actualPos] {
-		return
-	}
-
-	line, col := m.buf.LineCol(actualPos)
+	line, col := m.buf.LineCol(idx)
 	m.extraCursors = append(m.extraCursors, EditorCursor{
 		Line:   line,
 		Col:    col,
-		GapPos: actualPos,
+		GapPos: idx,
 	})
 }
 

@@ -16,18 +16,21 @@ func TestNewUndoStack(t *testing.T) {
 
 func TestPushAndUndo(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "hello"})
+	u.Push(Operation{Type: "insert", Pos: 0, Text: "hello"})
 
 	if !u.CanUndo() {
 		t.Error("should have undo after push")
 	}
 
-	op, ok := u.Undo()
+	ops, ok := u.Undo()
 	if !ok {
 		t.Error("undo should succeed")
 	}
-	if op.Type != OpInsert || op.Text != "hello" {
-		t.Errorf("unexpected operation: %+v", op)
+	if len(ops) != 1 {
+		t.Fatalf("expected 1 operation, got %d", len(ops))
+	}
+	if ops[0].Type != "insert" || ops[0].Text != "hello" {
+		t.Errorf("unexpected operation: %+v", ops[0])
 	}
 	if u.CanUndo() {
 		t.Error("should not have more undo")
@@ -36,29 +39,25 @@ func TestPushAndUndo(t *testing.T) {
 
 func TestUndoAndRedo(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "a"})
-	u.Push(Operation{Type: OpInsert, Pos: 1, Text: "b"})
+	u.Push(Operation{Type: "insert", Pos: 0, Text: "a"})
+	u.Push(Operation{Type: "insert", Pos: 1, Text: "b"})
 
-	// Undo last
-	op, _ := u.Undo()
-	if op.Text != "b" {
-		t.Errorf("expected 'b', got %q", op.Text)
+	ops, _ := u.Undo()
+	if ops[0].Text != "b" {
+		t.Errorf("expected 'b', got %q", ops[0].Text)
 	}
-	// Undo first
-	op, _ = u.Undo()
-	if op.Text != "a" {
-		t.Errorf("expected 'a', got %q", op.Text)
+	ops, _ = u.Undo()
+	if ops[0].Text != "a" {
+		t.Errorf("expected 'a', got %q", ops[0].Text)
 	}
 
-	// Redo first
-	op, _ = u.Redo()
-	if op.Text != "a" {
-		t.Errorf("expected 'a' on redo, got %q", op.Text)
+	ops, _ = u.Redo()
+	if ops[0].Text != "a" {
+		t.Errorf("expected 'a' on redo, got %q", ops[0].Text)
 	}
-	// Redo second
-	op, _ = u.Redo()
-	if op.Text != "b" {
-		t.Errorf("expected 'b' on redo, got %q", op.Text)
+	ops, _ = u.Redo()
+	if ops[0].Text != "b" {
+		t.Errorf("expected 'b' on redo, got %q", ops[0].Text)
 	}
 
 	if u.CanRedo() {
@@ -68,27 +67,25 @@ func TestUndoAndRedo(t *testing.T) {
 
 func TestPushDiscardsRedoHistory(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "a"})
-	u.Push(Operation{Type: OpInsert, Pos: 1, Text: "b"})
+	u.Push(Operation{Type: "insert", Pos: 0, Text: "a"})
+	u.Push(Operation{Type: "insert", Pos: 1, Text: "b"})
 
-	// Undo one
 	u.Undo()
-	// Now push a new operation - should discard 'b' redo
-	u.Push(Operation{Type: OpInsert, Pos: 1, Text: "c"})
+	u.Push(Operation{Type: "insert", Pos: 1, Text: "c"})
 
 	if u.CanRedo() {
 		t.Error("redo history should be discarded after new push")
 	}
 
-	op, _ := u.Undo()
-	if op.Text != "c" {
-		t.Errorf("expected 'c', got %q", op.Text)
+	ops, _ := u.Undo()
+	if ops[0].Text != "c" {
+		t.Errorf("expected 'c', got %q", ops[0].Text)
 	}
 }
 
 func TestClear(t *testing.T) {
 	u := NewUndoStack()
-	u.Push(Operation{Type: OpInsert, Pos: 0, Text: "a"})
+	u.Push(Operation{Type: "insert", Pos: 0, Text: "a"})
 	u.Clear()
 
 	if u.CanUndo() {
@@ -102,7 +99,7 @@ func TestClear(t *testing.T) {
 func TestMultipleOperations(t *testing.T) {
 	u := NewUndoStack()
 	for i := 0; i < 100; i++ {
-		u.Push(Operation{Type: OpInsert, Pos: i, Text: "x"})
+		u.Push(Operation{Type: "insert", Pos: i, Text: "x"})
 	}
 
 	count := 0
@@ -112,5 +109,75 @@ func TestMultipleOperations(t *testing.T) {
 	}
 	if count != 100 {
 		t.Errorf("expected 100 undos, got %d", count)
+	}
+}
+
+func TestPushCompositeUndoRedo(t *testing.T) {
+	u := NewUndoStack()
+
+	ops := []Operation{
+		{Type: "insert", Pos: 0, Text: "a"},
+		{Type: "insert", Pos: 1, Text: "b"},
+		{Type: "insert", Pos: 2, Text: "c"},
+	}
+	u.PushComposite(ops)
+	if u.Len() != 1 {
+		t.Fatalf("PushComposite should count as 1 undo unit, got %d", u.Len())
+	}
+
+	undoOps, ok := u.Undo()
+	if !ok {
+		t.Fatal("expected undo to succeed")
+	}
+	if len(undoOps) != 3 {
+		t.Fatalf("expected 3 operations in composite undo, got %d", len(undoOps))
+	}
+	if undoOps[0].Text != "c" {
+		t.Errorf("expected first undo op to be 'c' (reversed), got %q", undoOps[0].Text)
+	}
+	if undoOps[2].Text != "a" {
+		t.Errorf("expected last undo op to be 'a' (reversed), got %q", undoOps[2].Text)
+	}
+
+	redoOps, ok := u.Redo()
+	if !ok {
+		t.Fatal("expected redo to succeed")
+	}
+	if len(redoOps) != 3 {
+		t.Fatalf("expected 3 operations in composite redo, got %d", len(redoOps))
+	}
+}
+
+func TestUndoRedoCompositeStack(t *testing.T) {
+	u := NewUndoStack()
+
+	u.Push(Operation{Type: "insert", Pos: 0, Text: "x"})
+	u.PushComposite([]Operation{
+		{Type: "insert", Pos: 0, Text: "y"},
+		{Type: "insert", Pos: 0, Text: "z"},
+	})
+	u.Push(Operation{Type: "insert", Pos: 0, Text: "w"})
+
+	if u.Len() != 3 {
+		t.Fatalf("expected 3 undo units, got %d", u.Len())
+	}
+
+	ops, _ := u.Undo()
+	if len(ops) != 1 || ops[0].Text != "w" {
+		t.Fatal("first undo should be single 'w'")
+	}
+
+	ops, _ = u.Undo()
+	if len(ops) != 2 {
+		t.Fatalf("second undo should be composite of 2, got %d", len(ops))
+	}
+
+	ops, _ = u.Undo()
+	if len(ops) != 1 || ops[0].Text != "x" {
+		t.Fatal("third undo should be single 'x'")
+	}
+
+	if u.CanUndo() {
+		t.Fatal("stack should be empty")
 	}
 }
