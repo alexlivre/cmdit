@@ -330,7 +330,7 @@ func (m *Model) renderPalette() string {
 // --- Welcome Screen ---
 
 func (m *Model) renderWelcome() string {
-	logo := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render("  cmdit v0.4.1")
+	logo := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render("  cmdit " + Version)
 	subtitle := "Text editor for humans"
 
 	var lines []string

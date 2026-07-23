@@ -22,6 +22,11 @@ import (
 	"github.com/alexb/cmdit/internal/renderer"
 )
 
+// Version is the current released version of cmdit, shown in the welcome
+// screen and other user-facing surfaces. Bump this together with the
+// CHANGELOG / README badge on each release.
+const Version = "v0.4.2"
+
 // Mode represents the current editor mode.
 type Mode int
 
@@ -306,21 +311,12 @@ func (m *Model) SetFilename(name string) {
 // ResetMode forces the editor back to Normal mode (used when switching tabs).
 func (m *Model) ResetMode() { m.mode = ModeNormal }
 
-// Save exports the save operation for the tab container.
+// Save exports the save operation for external callers (e.g. tab container).
+// It routes through the proper save() path so errors are surfaced via the
+// status bar instead of being silently dropped and the buffer being wrongly
+// marked clean. If there is no filename it falls back to the save-as prompt.
 func (m *Model) Save() {
-	if m.filename == "" {
-		m.filename = "untitled.txt"
-	}
-	if err := fileio.Save(m.filename, m.buf); err == nil {
-		m.modified = false
-	}
-
-	// Format on save
-	if m.config.FormatOnSave {
-		m.applyFormat()
-		// Re-save with formatted content
-		fileio.Save(m.filename, m.buf)
-	}
+	m.save()
 }
 
 // --- Helpers ---

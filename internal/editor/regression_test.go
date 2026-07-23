@@ -304,3 +304,30 @@ func TestGoToLineOutOfRange(t *testing.T) {
 		t.Error("expected error command for out-of-range line")
 	}
 }
+
+// Regression: undo()/redo() used len(op.Text) (byte count) to drive
+// DeleteForward, but DeleteForward removes one rune per call. For multi-byte
+// UTF-8 text (accents, emojis, CJK) the byte length exceeds the rune count, so
+// undo/redo corrupted the buffer by deleting too many runes.
+func TestUndoRedoMultibyteRunes(t *testing.T) {
+	const content = "Olá Mundo! 日本語 emoji 🎉"
+	m := New()
+	m.mode = ModeNormal
+	m.cursor.SetPos(0, 0)
+	m.insertText(content)
+	if got := m.buf.String(); got != content {
+		t.Fatalf("insert: buf = %q, want %q", got, content)
+	}
+
+	// Undo should fully remove the inserted text, leaving the buffer empty.
+	m.undo()
+	if got := m.buf.String(); got != "" {
+		t.Errorf("undo multibyte: buf = %q, want empty", got)
+	}
+
+	// Redo should restore the inserted text exactly.
+	m.redo()
+	if got := m.buf.String(); got != content {
+		t.Errorf("redo multibyte: buf = %q, want %q", got, content)
+	}
+}

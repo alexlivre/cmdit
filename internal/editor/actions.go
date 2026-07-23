@@ -150,7 +150,7 @@ func (m *Model) undo() {
 		case "insert":
 			m.buf.InsertString(op.Text)
 		case "delete":
-			for i := 0; i < len(op.Text); i++ {
+			for i := 0; i < utf8.RuneCountInString(op.Text); i++ {
 				m.buf.DeleteForward()
 			}
 		}
@@ -170,7 +170,7 @@ func (m *Model) redo() {
 		m.moveGapTo(op.Pos)
 		switch op.Type {
 		case "insert":
-			for i := 0; i < len(op.Text); i++ {
+			for i := 0; i < utf8.RuneCountInString(op.Text); i++ {
 				m.buf.DeleteForward()
 			}
 		case "delete":
