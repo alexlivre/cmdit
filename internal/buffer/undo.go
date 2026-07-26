@@ -123,5 +123,3 @@ func (u *UndoStack) Clear() {
 func (u *UndoStack) Len() int {
 	return u.unitCount
 }
-
-

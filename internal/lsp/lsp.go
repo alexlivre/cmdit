@@ -210,11 +210,11 @@ type Client struct {
 	requestID int
 	mu        sync.Mutex
 
-	ctx        context.Context
-	cancelCtx  context.CancelFunc
-	cancel     context.CancelFunc // cancels ctx and unblocks I/O (closes pipes / kills process)
-	closeOnce  sync.Once
-	done       chan struct{}
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+	cancel    context.CancelFunc // cancels ctx and unblocks I/O (closes pipes / kills process)
+	closeOnce sync.Once
+	done      chan struct{}
 
 	onDiagnostics func(uri string, diagnostics []Diagnostic)
 	onCompletion  func(id int, items []CompletionItem)
