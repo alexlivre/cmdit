@@ -210,9 +210,11 @@ type Client struct {
 	requestID int
 	mu        sync.Mutex
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	done   chan struct{}
+	ctx        context.Context
+	cancelCtx  context.CancelFunc
+	cancel     context.CancelFunc // cancels ctx and unblocks I/O (closes pipes / kills process)
+	closeOnce  sync.Once
+	done       chan struct{}
 
 	onDiagnostics func(uri string, diagnostics []Diagnostic)
 	onCompletion  func(id int, items []CompletionItem)
@@ -223,24 +225,29 @@ type Client struct {
 // NewClient creates a new LSP client and starts the server.
 // serverCmd is the command to run (e.g., "gopls").
 func NewClient(serverCmd string, args ...string) (*Client, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	c := &Client{
 		requestID: 1,
 		pending:   make(map[int]chan Response),
 		ctx:       ctx,
-		cancel:    cancel,
+		cancelCtx: cancelCtx,
 		done:      make(chan struct{}),
+	}
+	// cancel unblocks readLoop by closing pipes and killing the process.
+	c.cancel = func() {
+		c.forceClose()
 	}
 
 	cmd := exec.Command(serverCmd, args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		cancel()
+		cancelCtx()
 		return nil, fmt.Errorf("lsp stdin: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		cancel()
+		_ = stdin.Close()
+		cancelCtx()
 		return nil, fmt.Errorf("lsp stdout: %w", err)
 	}
 
@@ -250,13 +257,34 @@ func NewClient(serverCmd string, args ...string) (*Client, error) {
 	c.reader = bufio.NewReader(stdout)
 
 	if err := cmd.Start(); err != nil {
-		cancel()
+		_ = stdin.Close()
+		_ = stdout.Close()
+		cancelCtx()
 		return nil, fmt.Errorf("lsp start: %w", err)
 	}
 
 	go c.readLoop()
 
 	return c, nil
+}
+
+// forceClose cancels the context, closes pipes, and kills the server process.
+// Safe to call multiple times.
+func (c *Client) forceClose() {
+	c.closeOnce.Do(func() {
+		if c.cancelCtx != nil {
+			c.cancelCtx()
+		}
+		if c.stdin != nil {
+			_ = c.stdin.Close()
+		}
+		if c.stdout != nil {
+			_ = c.stdout.Close()
+		}
+		if c.cmd != nil && c.cmd.Process != nil {
+			_ = c.cmd.Process.Kill()
+		}
+	})
 }
 
 // Initialize sends the initialize request and waits for the response.
@@ -334,13 +362,54 @@ func (c *Client) OnCompletion(handler func(id int, items []CompletionItem)) {
 	c.onCompletion = handler
 }
 
-// Shutdown sends the shutdown request and terminates the server.
+// Shutdown sends a best-effort LSP shutdown, then force-closes pipes and the
+// process so readLoop always exits (even if the server never replies).
 func (c *Client) Shutdown() error {
-	c.request("shutdown", nil)
-	c.notify("exit", nil)
-	c.cancel()
-	<-c.done
-	return c.cmd.Wait()
+	// Short timeout: unresponsive servers (or test stubs like `sleep`) must not
+	// block Shutdown for the full request timeout.
+	c.mu.Lock()
+	id := c.requestID
+	c.requestID++
+	ch := make(chan Response, 1)
+	c.pending[id] = ch
+	c.mu.Unlock()
+
+	_ = c.writeMessage(Request{
+		JSONRPC: "2.0",
+		ID:      id,
+		Method:  "shutdown",
+	})
+
+	select {
+	case <-ch:
+	case <-time.After(500 * time.Millisecond):
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
+	case <-c.ctx.Done():
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
+	}
+
+	_ = c.notify("exit", nil)
+	c.forceClose()
+
+	select {
+	case <-c.done:
+	case <-time.After(2 * time.Second):
+		return fmt.Errorf("lsp shutdown: readLoop did not exit")
+	}
+
+	if c.cmd == nil || c.cmd.Process == nil {
+		return nil
+	}
+	err := c.cmd.Wait()
+	// Kill always makes Wait return an error; treat that as success after forceClose.
+	if err != nil {
+		return nil
+	}
+	return nil
 }
 
 // --- Internal ---

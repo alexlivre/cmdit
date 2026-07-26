@@ -26,7 +26,7 @@ import (
 // Version is the current released version of cmdit, shown in the welcome
 // screen and other user-facing surfaces. Bump this together with the
 // CHANGELOG / README badge on each release.
-const Version = "v0.4.2"
+const Version = "v0.4.3"
 
 // Mode represents the current editor mode.
 type Mode int

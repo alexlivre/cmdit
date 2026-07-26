@@ -2,7 +2,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev)
 [![Tests](https://img.shields.io/badge/tests-175%2B%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-v0.4.2-blue)](https://github.com/alexlivre/cmdit/releases)
+[![Version](https://img.shields.io/badge/version-v0.4.3-blue)](https://github.com/alexlivre/cmdit/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
 
