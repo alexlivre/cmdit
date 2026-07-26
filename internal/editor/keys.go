@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -169,6 +170,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchCurrent = 0
 		return m, nil
 
+	case "ctrl+g":
+		m.enterGoToLine()
+		return m, nil
+
 	// Multi-cursor
 	case "ctrl+d":
 		m.addNextOccurrence()
@@ -200,16 +205,16 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.extraCursors[i].Line++
 			m.extraCursors[i].Col = 0
 		}
+		m.refreshExtraCursorGapPos()
+		m.syncGapToCursor()
 		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 		return m, nil
 
 	case "tab":
 		m.clearSelection()
+		// insertTextAtAllCursors already advances Col by the inserted width.
 		m.insertTextAtAllCursors("    ")
-		m.cursor.Col += 4
-		for i := range m.extraCursors {
-			m.extraCursors[i].Col += 4
-		}
+		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 		return m, nil
 
 	// Navigation
@@ -238,7 +243,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "end":
 		m.clearSelection()
 		lineText := m.currentLineText()
-		m.cursor.Col = len(lineText)
+		m.cursor.Col = utf8.RuneCountInString(lineText)
 		m.syncGapToCursor()
 		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 		return m, nil
@@ -252,7 +257,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.clearSelection()
 		lastLine := m.buf.LineCount() - 1
 		lastLineText := m.lineText(lastLine)
-		m.cursor.SetPos(lastLine, len(lastLineText))
+		m.cursor.SetPos(lastLine, utf8.RuneCountInString(lastLineText))
 		m.syncGapToCursor()
 		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 		return m, nil
@@ -263,6 +268,35 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+right":
 		m.clearSelection()
 		m.moveCursorWordRight()
+		return m, nil
+
+	case "pgup", "pageup":
+		m.clearSelection()
+		page := m.viewport.Height()
+		if page < 1 {
+			page = 1
+		}
+		m.viewport.ScrollUp(page)
+		m.cursor.Line -= page
+		if m.cursor.Line < 0 {
+			m.cursor.Line = 0
+		}
+		m.clampCursor()
+		m.syncGapToCursor()
+		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
+		return m, nil
+
+	case "pgdown", "pagedown":
+		m.clearSelection()
+		page := m.viewport.Height()
+		if page < 1 {
+			page = 1
+		}
+		m.viewport.ScrollDown(page)
+		m.cursor.Line += page
+		m.clampCursor()
+		m.syncGapToCursor()
+		m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
 		return m, nil
 
 	case "alt+z":
@@ -308,29 +342,36 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleBackspace() (tea.Model, tea.Cmd) {
 	m.clearSelection()
-	if m.buf.GapPosition() == 0 {
+	if m.buf.GapPosition() == 0 && len(m.extraCursors) == 0 {
 		return m, nil
 	}
 
 	if len(m.extraCursors) > 0 {
-		all := m.allCursors()
+		positions := m.sortedCursorPositions()
+		primaryPos := m.cursorGapPos(m.cursor.Line, m.cursor.Col)
+		var ops []buffer.Operation
 		primaryDeleted := false
-		for i := len(all) - 1; i >= 0; i-- {
-			c := all[i]
-			if c.GapPos == 0 {
+
+		// High → low so lower positions stay valid.
+		for i := len(positions) - 1; i >= 0; i-- {
+			pos := positions[i]
+			if pos == 0 {
 				continue
 			}
-			r := m.buf.RuneAt(c.GapPos - 1)
-			m.undoStack.Push(buffer.Operation{
+			r := m.buf.RuneAt(pos - 1)
+			ops = append(ops, buffer.Operation{
 				Type: "insert",
-				Pos:  c.GapPos - 1,
+				Pos:  pos - 1,
 				Text: string(r),
 			})
-			m.moveGapTo(c.GapPos)
+			m.moveGapTo(pos)
 			m.buf.Backspace()
-			if i == 0 {
+			if pos == primaryPos {
 				primaryDeleted = true
 			}
+		}
+		if len(ops) > 0 {
+			m.undoStack.PushComposite(ops)
 		}
 		if primaryDeleted {
 			m.cursor.Col--
@@ -339,14 +380,14 @@ func (m *Model) handleBackspace() (tea.Model, tea.Cmd) {
 			}
 		}
 		for i := range m.extraCursors {
-			if all[i+1].GapPos > 0 {
+			if m.extraCursors[i].Col > 0 {
 				m.extraCursors[i].Col--
-				if m.extraCursors[i].Col < 0 {
-					m.extraCursors[i].Col = 0
-				}
 			}
 		}
+		m.refreshExtraCursorGapPos()
+		m.syncGapToCursor()
 		m.modified = true
+		m.sendDidChange()
 	} else {
 		r := m.buf.RuneAt(m.buf.GapPosition() - 1)
 		m.undoStack.Push(buffer.Operation{
@@ -361,6 +402,7 @@ func (m *Model) handleBackspace() (tea.Model, tea.Cmd) {
 			}
 			m.modified = true
 			m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
+			m.sendDidChange()
 		}
 	}
 	return m, nil
@@ -368,27 +410,35 @@ func (m *Model) handleBackspace() (tea.Model, tea.Cmd) {
 
 func (m *Model) handleDelete() (tea.Model, tea.Cmd) {
 	m.clearSelection()
-	if m.buf.GapPosition() >= m.buf.Len() {
+	if m.buf.GapPosition() >= m.buf.Len() && len(m.extraCursors) == 0 {
 		return m, nil
 	}
 
 	if len(m.extraCursors) > 0 {
-		all := m.allCursors()
-		for i := len(all) - 1; i >= 0; i-- {
-			c := all[i]
-			if c.GapPos >= m.buf.Len() {
+		positions := m.sortedCursorPositions()
+		var ops []buffer.Operation
+		// High → low so lower positions stay valid.
+		for i := len(positions) - 1; i >= 0; i-- {
+			pos := positions[i]
+			if pos >= m.buf.Len() {
 				continue
 			}
-			r := m.buf.RuneAt(c.GapPos)
-			m.undoStack.Push(buffer.Operation{
+			r := m.buf.RuneAt(pos)
+			ops = append(ops, buffer.Operation{
 				Type: "insert",
-				Pos:  c.GapPos,
+				Pos:  pos,
 				Text: string(r),
 			})
-			m.moveGapTo(c.GapPos)
+			m.moveGapTo(pos)
 			m.buf.DeleteForward()
 		}
-		m.modified = true
+		if len(ops) > 0 {
+			m.undoStack.PushComposite(ops)
+			m.refreshExtraCursorGapPos()
+			m.syncGapToCursor()
+			m.modified = true
+			m.sendDidChange()
+		}
 	} else {
 		r := m.buf.RuneAt(m.buf.GapPosition())
 		m.undoStack.Push(buffer.Operation{
@@ -398,6 +448,7 @@ func (m *Model) handleDelete() (tea.Model, tea.Cmd) {
 		})
 		if m.buf.DeleteForward() {
 			m.modified = true
+			m.sendDidChange()
 		}
 	}
 	return m, nil
@@ -814,7 +865,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
-		m.clearSelection()
+		m.clearExtraCursors()
 		lineNumWidth := m.lineNumberWidth()
 		clickLine := m.viewport.ScrollY() + msg.Y
 		clickCol := msg.X - lineNumWidth - 1 + m.viewport.ScrollX()
@@ -824,6 +875,30 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.cursor.SetPos(clickLine, clickCol)
 		m.clampCursor()
 		m.syncGapToCursor()
+		pos := m.buf.GapPosition()
+		m.selStart = pos
+		m.selEnd = pos
+		m.selecting = true
+		return m, nil
+
+	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionMotion && m.selecting:
+		lineNumWidth := m.lineNumberWidth()
+		clickLine := m.viewport.ScrollY() + msg.Y
+		clickCol := msg.X - lineNumWidth - 1 + m.viewport.ScrollX()
+		if clickCol < 0 {
+			clickCol = 0
+		}
+		m.cursor.SetPos(clickLine, clickCol)
+		m.clampCursor()
+		m.syncGapToCursor()
+		m.selEnd = m.buf.GapPosition()
+		return m, nil
+
+	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease:
+		m.selecting = false
+		if m.selStart == m.selEnd {
+			m.clearSelection()
+		}
 		return m, nil
 	}
 	return m, nil

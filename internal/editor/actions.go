@@ -20,6 +20,8 @@ func (m *Model) executeAction(id string) {
 		m.save()
 	case "file.save-as":
 		m.enterSaveAs()
+	case "file.open":
+		m.enterFilePicker()
 	case "file.quit":
 		if m.modified {
 			m.mode = ModeConfirm
@@ -106,9 +108,13 @@ func (m *Model) save() {
 	m.modified = false
 
 	if m.config.FormatOnSave {
+		before := m.buf.String()
 		m.applyFormat()
-		if err := fileio.Save(m.filename, m.buf); err != nil {
-			m.showError(fmt.Sprintf("Format save error: %v", err))
+		if m.buf.String() != before {
+			if err := fileio.Save(m.filename, m.buf); err != nil {
+				m.showError(fmt.Sprintf("Format save error: %v", err))
+				m.modified = true
+			}
 		}
 	}
 }
@@ -263,6 +269,7 @@ func (m *Model) getSelectedText() string {
 func (m *Model) clearSelection() {
 	m.selStart = -1
 	m.selEnd = -1
+	m.selecting = false
 }
 
 func (m *Model) deleteSelection() {

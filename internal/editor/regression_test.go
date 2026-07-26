@@ -81,10 +81,10 @@ func TestAddNextOccurrenceWrap(t *testing.T) {
 	}
 }
 
-// Bug: handleDelete with extraCursors. Captured allCursors use a primary
-// GapPos captured BEFORE the loop. After the first iteration deletes a rune
-// BEFORE the primary's gap, that gap's logical position is no longer valid:
-// the code does not decrement it, so the wrong rune is deleted.
+// Bug: handleDelete with extraCursors previously processed unsorted cursors and
+// left GapPos stale, deleting the wrong runes. Correct behavior deletes the
+// character at each cursor (high→low), yielding "bdef" from "abcdef" with
+// cursors at col 0 and col 2.
 func TestHandleDeleteExtraCursorsPositions(t *testing.T) {
 	m := New()
 	m.mode = ModeNormal
@@ -95,8 +95,8 @@ func TestHandleDeleteExtraCursorsPositions(t *testing.T) {
 	m.syncGapToCursor()
 	m.extraCursors = append(m.extraCursors, EditorCursor{Line: 0, Col: 0, GapPos: 0})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyDelete})
-	if got := m.buf.String(); got != "bcef" {
-		t.Errorf("handleDelete multi: buf = %q, want \"bcef\" (stale pos, demonstrates bug)", got)
+	if got := m.buf.String(); got != "bdef" {
+		t.Errorf("handleDelete multi: buf = %q, want \"bdef\"", got)
 	}
 }
 

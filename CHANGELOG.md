@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] — 2026-07-26
+
+### Fixed
+
+- **Multi-cursor** — Refresh and sort cursor `GapPos` after edits; composite undo for multi-cursor backspace/delete/auto-close; rune-safe Ctrl+D occurrence search.
+- **Tab** — No longer double-advances the cursor column when inserting spaces.
+- **LSP on open** — `NewWithFile` / CLI open now starts the language server (previously only file-picker open did).
+- **Format on save** — Keeps the buffer marked dirty if the post-format save fails.
+- **Go to Line / Open File** — Ctrl+G bound; command palette `file.open` opens the file picker.
+- **PageUp / PageDown** — Implemented viewport paging.
+- **Mouse** — Enabled cell motion; click + drag selects text; selection is rendered.
+- **LSP shutdown** — Cancel closes pipes and kills the process so `readLoop` always exits; short timeout on shutdown request (fixes CI hangs).
+
+### Changed
+
+- Status bar multi-cursor label uses English (`cursors`).
+- Version bump to `v0.4.3`.
+
 ## [0.4.2] — 2026-05-01
 
 ### Added — Phase 10 & 11: Quality, Stability, Production
