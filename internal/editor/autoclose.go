@@ -30,47 +30,34 @@ func (m *Model) handleAutoClose(openChar rune) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	cursors := m.allCursors()
+	positions := m.sortedCursorPositions()
+	pair := string(openChar) + string(closer)
+	var ops []buffer.Operation
 
-	// Process from end to start to preserve positions
-	for i := len(cursors) - 1; i >= 0; i-- {
-		c := cursors[i]
-		m.moveGapTo(c.GapPos)
-		cursorPos := m.buf.GapPosition()
-
-		// Insert both characters
-		m.buf.Insert(openChar)
-		m.buf.Insert(closer)
-
-		// Position primary cursor between the pair (i==0 is always primary)
-		if i == 0 {
-			m.buf.MoveGapLeft()
-		}
-
-		// Push undo for openChar first, closer second
-		// LIFO stack: closer pops first (correct: delete ')' then '(')
-		m.undoStack.Push(buffer.Operation{
+	// High → low so earlier positions stay valid after inserts.
+	for i := len(positions) - 1; i >= 0; i-- {
+		pos := positions[i]
+		m.moveGapTo(pos)
+		m.buf.InsertString(pair)
+		ops = append(ops, buffer.Operation{
 			Type: "delete",
-			Pos:  cursorPos,
-			Text: string(openChar),
+			Pos:  pos,
+			Text: pair,
 		})
-		m.undoStack.Push(buffer.Operation{
-			Type: "delete",
-			Pos:  cursorPos + 1,
-			Text: string(closer),
-		})
-
-		// Mark position as auto-closed
-		m.markAutoClosed(cursorPos)
+		m.markAutoClosed(pos)
 	}
+	m.undoStack.PushComposite(ops)
 
-	// Update cursor columns — primary cursor is now one col right of original
+	// Leave primary cursor between the pair.
+	primaryPos := m.cursorGapPos(m.cursor.Line, m.cursor.Col)
+	m.moveGapTo(primaryPos + 1)
+
 	m.cursor.Col++
-
-	// Update extra cursors (each is one col right of original)
 	for i := range m.extraCursors {
 		m.extraCursors[i].Col++
 	}
+	m.refreshExtraCursorGapPos()
+	m.syncGapToCursor()
 
 	m.modified = true
 	m.sendDidChange()

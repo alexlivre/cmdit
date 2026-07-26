@@ -106,7 +106,11 @@ func (m *Model) renderContent() string {
 			styledLineNum := m.lineNumStyle.Render(lineNum)
 
 			rawLine := lines[i]
-			lineWithGuides := m.applyIndentGuides(rawLine, rawLine)
+			displayLine := rawLine
+			if m.hasSelection() {
+				displayLine = m.applySelectionToLine(rawLine, i)
+			}
+			lineWithGuides := m.applyIndentGuides(displayLine, rawLine)
 			segments := m.highlighter.HighlightLine(lineWithGuides, m.language)
 			lineText := highlight.RenderSegments(segments)
 
@@ -161,10 +165,47 @@ func (m *Model) applyIndentGuides(lineText string, rawLine string) string {
 	b.Grow(len(runes) + indent/4*3)
 	for i, r := range runes {
 		if i > 0 && i < indent && i%4 == 0 {
-			b.WriteString("│")
+			b.WriteString(m.indentGuideStyle.Render("│"))
 		} else {
 			b.WriteRune(r)
 		}
+	}
+	return b.String()
+}
+
+// applySelectionToLine highlights the selected range on a raw (unstyled) line.
+func (m *Model) applySelectionToLine(rawLine string, lineIdx int) string {
+	lineStart := m.buf.LineStart(lineIdx)
+	runes := []rune(rawLine)
+	lineEnd := lineStart + len(runes)
+
+	start, end := m.selStart, m.selEnd
+	if start > end {
+		start, end = end, start
+	}
+	if end <= lineStart || start >= lineEnd {
+		return rawLine
+	}
+
+	selStart := start - lineStart
+	if selStart < 0 {
+		selStart = 0
+	}
+	selEnd := end - lineStart
+	if selEnd > len(runes) {
+		selEnd = len(runes)
+	}
+	if selStart >= selEnd {
+		return rawLine
+	}
+
+	var b strings.Builder
+	if selStart > 0 {
+		b.WriteString(string(runes[:selStart]))
+	}
+	b.WriteString(m.selectionStyle.Render(string(runes[selStart:selEnd])))
+	if selEnd < len(runes) {
+		b.WriteString(string(runes[selEnd:]))
 	}
 	return b.String()
 }
@@ -219,7 +260,7 @@ func (m *Model) renderStatus() string {
 	// Show multi-cursor count
 	mcInfo := ""
 	if len(m.extraCursors) > 0 {
-		mcInfo = fmt.Sprintf(" %d cursores", len(m.extraCursors)+1)
+		mcInfo = fmt.Sprintf(" %d cursors", len(m.extraCursors)+1)
 	}
 
 	// Show diagnostics count

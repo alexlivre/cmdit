@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -86,8 +87,9 @@ type Model struct {
 	confirmAction ConfirmAction
 
 	// Selection (logical indices)
-	selStart int
-	selEnd   int
+	selStart  int
+	selEnd    int
+	selecting bool // true while mouse-drag selecting
 
 	// Search state
 	searchQuery   string
@@ -226,6 +228,7 @@ func NewWithFile(path string) (*Model, error) {
 	m.filename = path
 	m.language = highlight.DetectLanguage(path)
 	m.mode = ModeNormal
+	m.startLSP()
 
 	return m, nil
 }
@@ -338,13 +341,15 @@ func (m *Model) insertTextAtAllCursors(text string) {
 		return
 	}
 
-	all := m.allCursors()
+	positions := m.sortedCursorPositions()
 	var ops []buffer.Operation
-	for i := len(all) - 1; i >= 0; i-- {
-		m.moveGapTo(all[i].GapPos)
+	// High → low so earlier positions stay valid after inserts.
+	for i := len(positions) - 1; i >= 0; i-- {
+		pos := positions[i]
+		m.moveGapTo(pos)
 		ops = append(ops, buffer.Operation{
 			Type: "delete",
-			Pos:  all[i].GapPos,
+			Pos:  pos,
 			Text: text,
 		})
 		m.buf.InsertString(text)
@@ -356,6 +361,8 @@ func (m *Model) insertTextAtAllCursors(text string) {
 	for i := range m.extraCursors {
 		m.extraCursors[i].Col += delta
 	}
+	m.refreshExtraCursorGapPos()
+	m.syncGapToCursor()
 	m.modified = true
 	m.sendDidChange()
 }
@@ -391,8 +398,9 @@ func (m *Model) clampCursor() {
 
 func (m *Model) clampCursorCol() {
 	lineText := m.currentLineText()
-	if m.cursor.Col > len(lineText) {
-		m.cursor.Col = len(lineText)
+	maxCol := utf8.RuneCountInString(lineText)
+	if m.cursor.Col > maxCol {
+		m.cursor.Col = maxCol
 	}
 	if m.cursor.Col < 0 {
 		m.cursor.Col = 0
@@ -451,7 +459,7 @@ func (m *Model) moveCursorLeft() {
 	} else if m.cursor.Line > 0 {
 		m.cursor.Line--
 		prevLineText := m.lineText(m.cursor.Line)
-		m.cursor.Col = len(prevLineText)
+		m.cursor.Col = utf8.RuneCountInString(prevLineText)
 	}
 	m.syncGapToCursor()
 	m.viewport.EnsureVisible(m.cursor.Line, m.cursor.Col)
@@ -459,7 +467,7 @@ func (m *Model) moveCursorLeft() {
 
 func (m *Model) moveCursorRight() {
 	lineText := m.currentLineText()
-	if m.cursor.Col < len(lineText) {
+	if m.cursor.Col < utf8.RuneCountInString(lineText) {
 		m.cursor.Col++
 	} else if m.cursor.Line < m.buf.LineCount()-1 {
 		m.cursor.Line++
@@ -583,16 +591,44 @@ func validateFileName(name string) error {
 
 // --- Multi-cursor helpers ---
 
-// allCursors returns all active cursors (primary + extras) sorted by position.
+// cursorGapPos returns the logical gap index for a (line, col) position.
+func (m *Model) cursorGapPos(line, col int) int {
+	return m.buf.LineStart(line) + col
+}
+
+// refreshExtraCursorGapPos recomputes GapPos for every extra cursor from Line/Col.
+func (m *Model) refreshExtraCursorGapPos() {
+	for i := range m.extraCursors {
+		m.extraCursors[i].GapPos = m.cursorGapPos(m.extraCursors[i].Line, m.extraCursors[i].Col)
+	}
+}
+
+// sortedCursorPositions returns primary + extra gap positions sorted ascending.
+func (m *Model) sortedCursorPositions() []int {
+	m.refreshExtraCursorGapPos()
+	positions := make([]int, 0, len(m.extraCursors)+1)
+	positions = append(positions, m.cursorGapPos(m.cursor.Line, m.cursor.Col))
+	for _, c := range m.extraCursors {
+		positions = append(positions, c.GapPos)
+	}
+	sort.Ints(positions)
+	return positions
+}
+
+// allCursors returns all active cursors (primary + extras) sorted by GapPos ascending.
 func (m *Model) allCursors() []EditorCursor {
+	m.refreshExtraCursorGapPos()
 	primary := EditorCursor{
 		Line:   m.cursor.Line,
 		Col:    m.cursor.Col,
-		GapPos: m.buf.GapPosition(),
+		GapPos: m.cursorGapPos(m.cursor.Line, m.cursor.Col),
 	}
 	all := make([]EditorCursor, 0, len(m.extraCursors)+1)
 	all = append(all, primary)
 	all = append(all, m.extraCursors...)
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].GapPos < all[j].GapPos
+	})
 	return all
 }
 
@@ -629,6 +665,28 @@ func isWordChar(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
 }
 
+// indexOfRunes finds needle in haystack starting at start (rune indices).
+// Returns -1 if not found.
+func indexOfRunes(haystack, needle []rune, start int) int {
+	if len(needle) == 0 || start < 0 || start > len(haystack) {
+		return -1
+	}
+	n := len(needle)
+	for i := start; i <= len(haystack)-n; i++ {
+		match := true
+		for j := 0; j < n; j++ {
+			if haystack[i+j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
 // addNextOccurrence finds the next occurrence of the word at cursor and adds it.
 func (m *Model) addNextOccurrence() {
 	word := m.wordAtCursor()
@@ -636,30 +694,31 @@ func (m *Model) addNextOccurrence() {
 		return
 	}
 
+	m.refreshExtraCursorGapPos()
 	existing := make(map[int]bool)
-	existing[m.buf.GapPosition()] = true
+	primaryPos := m.cursorGapPos(m.cursor.Line, m.cursor.Col)
+	existing[primaryPos] = true
 	for _, c := range m.extraCursors {
 		existing[c.GapPos] = true
 	}
 
-	lastPos := m.buf.GapPosition()
+	lastPos := primaryPos
 	for _, c := range m.extraCursors {
 		if c.GapPos > lastPos {
 			lastPos = c.GapPos
 		}
 	}
 
-	content := m.buf.String()
+	content := []rune(m.buf.String())
+	needle := []rune(word)
 	if lastPos+1 >= len(content) {
 		return
 	}
 	searchStart := lastPos + 1
 
-	idx := strings.Index(content[searchStart:], word)
-	if idx >= 0 {
-		idx += searchStart
-	} else {
-		idx = strings.Index(content, word)
+	idx := indexOfRunes(content, needle, searchStart)
+	if idx < 0 {
+		idx = indexOfRunes(content, needle, 0)
 	}
 	if idx < 0 || idx >= len(content) {
 		return
